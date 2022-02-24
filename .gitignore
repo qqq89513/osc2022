@@ -1,0 +1,7 @@
+# VS code
+.vscode/
+
+# C buildd
+*.o
+*.elf
+*.img
