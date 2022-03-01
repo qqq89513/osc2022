@@ -44,4 +44,4 @@ run:
 	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -kernel $(OUTPUT_DIR)/kernel8.img
 
 flash:
-	cp $(OUTPUT_DIR)/kernel8.img /E/kernel8.img
+	cp $(OUTPUT_DIR)/kernel8.img /D/kernel8.img

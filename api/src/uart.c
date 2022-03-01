@@ -1,7 +1,7 @@
 #include "general.h"
 #include "uart.h"
+#include "diy_printf.h"
 #include <stdarg.h>
-#include <stdio.h>
 
 /* Auxilary mini UART registers */
 #define AUX_ENABLE    ((volatile unsigned int*)(MMIO_BASE+0x00215004))
@@ -59,7 +59,7 @@ void uart_printf(const char *fmt, ...){
   char buf[128];
   va_list args;
   va_start(args, fmt);
-  len = vsnprintf(buf, sizeof(buf), fmt, args);
+  len = vsnprintf_(buf, sizeof(buf), fmt, args);
   if(len > 0)
     uart_puts(buf);
   va_end(args);
@@ -102,4 +102,8 @@ void uart_puts(char *s) {
 
     uart_send(*s++);
   }
+}
+
+void _putchar(char character){
+  uart_send(character);
 }

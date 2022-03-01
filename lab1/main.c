@@ -42,7 +42,7 @@ void main()
     // Execute cmd
     else if(temp == '\n'){
       input_s[index] = '\0';
-      uart_send('\n');
+      uart_printf("\r\n");
 
       if     (strcmp(input_s, CMD_HELP) == 0){
         uart_printf(CMD_HELP   "\t: print this help menu\r\n");
