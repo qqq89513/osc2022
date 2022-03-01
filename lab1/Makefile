@@ -6,12 +6,14 @@ OUTPUT_DIR = $(BUILD_DIR)/..
 SRCS = $(wildcard *.c) $(wildcard ../api/src/*.c)
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
 INCLUDES = -I ../api/inc/ -I ./
-CCFLAGS = -Wall -O2 -nostartfiles -ffreestanding -nostdinc -nostdlib
+CCFLAGS = -Wall -O3 -nostartfiles -ffreestanding 
+# CCFLAGS = -nostartfiles -ffreestanding -mthumb -Wall -fdump-rtl-expand -specs=nano.specs --specs=rdimon.specs   -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
 ASMFLAGS = $(CCFLAGS)
-LDFLAGS = -T link.ld --nostdlib
+LDFLAGS = -T link.ld -O3 -nostartfiles -ffreestanding -specs=nosys.specs
+# LDFLAGS = -T link.ld -nostartfiles -ffreestanding -nostartfiles -ffreestanding -mthumb -Wall -fdump-rtl-expand -specs=nano.specs --specs=rdimon.specs   -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
 TOOL_CHAIN_PREFIX = aarch64-none-elf
 CC = $(TOOL_CHAIN_PREFIX)-gcc
-LD = $(TOOL_CHAIN_PREFIX)-ld
+LD = $(TOOL_CHAIN_PREFIX)-gcc
 SIZE = $(TOOL_CHAIN_PREFIX)-size
 OBJCOPY = $(TOOL_CHAIN_PREFIX)-objcopy
 
