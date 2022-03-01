@@ -1,5 +1,7 @@
-#ifndef __GPIO_H
-#define __GPIO_H
+#ifndef __GENERAL_H
+#define __GENERAL_H
+
+#include <stdint.h>
 
 #define MMIO_BASE       0x3F000000
 
@@ -24,4 +26,6 @@
 
 #define WAIT_TICKS(cnt, tk) {cnt = tk; while(cnt--) { asm volatile("nop"); }}
 
-#endif /* __GPIO_H */
+void reset(int tick);
+
+#endif /* __GENERAL_H */

@@ -1,6 +1,7 @@
 
 #include "uart.h"
 #include "mbox.h"
+#include "general.h"
 #include <string.h>
 #include <stdint.h>
 
@@ -53,6 +54,8 @@ void main()
         uart_printf("Hello World!\r\n");
       }
       else if(strcmp(input_s, CMD_REBOOT) == 0){
+        uart_printf("Rebooting...\r\n");
+        reset(1000);
       }
       else if(strcmp(input_s, CMD_LSHW) == 0){
         show_hardware_info();

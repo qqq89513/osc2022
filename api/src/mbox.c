@@ -1,6 +1,6 @@
 
 #include "mbox.h"
-#include "gpio.h"
+#include "general.h"
 #include "uart.h"
 
 /* mailbox message buffer */
