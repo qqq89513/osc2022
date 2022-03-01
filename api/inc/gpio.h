@@ -1,3 +1,5 @@
+#ifndef __GPIO_H
+#define __GPIO_H
 
 #define MMIO_BASE       0x3F000000
 
@@ -21,3 +23,5 @@
 #define GPPUDCLK1       ((volatile unsigned int*)(MMIO_BASE+0x0020009C))
 
 #define WAIT_TICKS(cnt, tk) {cnt = tk; while(cnt--) { asm volatile("nop"); }}
+
+#endif /* __GPIO_H */

@@ -1,4 +1,7 @@
 #include "gpio.h"
+#include "uart.h"
+#include <stdarg.h>
+#include <stdio.h>
 
 /* Auxilary mini UART registers */
 #define AUX_ENABLE    ((volatile unsigned int*)(MMIO_BASE+0x00215004))
@@ -44,6 +47,22 @@ void uart_init()
   *GPPUD = 0x00;          // step 5.
   *GPPUDCLK0 = 0;         // step 6. flush GPIO setup
   *AUX_MU_CNTL = 3;       // enable Tx, Rx
+}
+
+/* Wrapping snprintf and HAL_UART_Transmit, just use this as printf
+  Note that this function does no buffering like printf.
+  The maximum characters to print at once is 128,
+  you can change buf size for that.
+*/
+void uart_printf(const char *fmt, ...){
+  int len = 0;
+  char buf[128];
+  va_list args;
+  va_start(args, fmt);
+  len = vsnprintf(buf, sizeof(buf), fmt, args);
+  if(len > 0)
+    uart_puts(buf);
+  va_end(args);
 }
 
 /**
