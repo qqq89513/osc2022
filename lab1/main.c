@@ -56,6 +56,7 @@ void main()
       else if(strcmp(input_s, CMD_REBOOT) == 0){
         uart_printf("Rebooting...\r\n");
         reset(1000);
+        while(1);
       }
       else if(strcmp(input_s, CMD_LSHW) == 0){
         show_hardware_info();

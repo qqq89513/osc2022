@@ -24,6 +24,20 @@ void uart_init()
 {
   register unsigned int r;
 
+  // Set GPIO14, 15 to no pull up/down. Follow the steps of p.101, BCM2837 datasheet
+  *GPPUD = GPPUD_PULL_UP;   // step 1. set pull up, down or none
+  WAIT_TICKS(r, 150);       // step 2. wait 150 ticks for signal to set-up
+  *GPPUDCLK0 = (1<<14) | (1<<15); // step 3. select clock for GPIO14, 15
+  WAIT_TICKS(r, 150);       // step 4. wait 150 ticks for signal to hold
+  *GPPUD = 0x00;          // step 5.
+  *GPPUDCLK0 = 0;         // step 6. flush GPIO setup
+
+  // Map UART1 to GPIO pins
+  r  = *GPFSEL1;
+  r &= ~((7<<12) | (7<<15));  // clear GPIO14, 15's state. and leave other's alone
+  r |=   (2<<12) | (2<<15);   // 2 is alt5, 12~14th bit for GPIO14, 15th~17 for GPIO15
+  *GPFSEL1 = r;
+
   // Initialize UART
   *AUX_ENABLE |= 1;    // enable UART1, AUX mini uart
   *AUX_MU_CNTL = 0;
@@ -32,20 +46,6 @@ void uart_init()
   *AUX_MU_IER  = 0;
   *AUX_MU_IIR  = 0xC6;   // disable interrupts
   *AUX_MU_BAUD = 270;  // 115200 baud
-
-  // Map UART1 to GPIO pins
-  r  = *GPFSEL1;
-  r &= ~((7<<12) | (7<<15));  // clear GPIO14, 15's state. and leave other's alone
-  r |=   (2<<12) | (2<<15);   // 2 is alt5, 12~14th bit for GPIO14, 15th~17 for GPIO15
-  *GPFSEL1 = r;
-
-  // Set GPIO14, 15 to no pull up/down. Follow the steps of p.101, BCM2837 datasheet
-  *GPPUD = GPPUD_PULL_UP;   // step 1. set pull up, down or none
-  WAIT_TICKS(r, 150);       // step 2. wait 150 ticks for signal to set-up
-  *GPPUDCLK0 = (1<<14) | (1<<15); // step 3. select clock for GPIO14, 15
-  WAIT_TICKS(r, 150);       // step 4. wait 150 ticks for signal to hold
-  *GPPUD = 0x00;          // step 5.
-  *GPPUDCLK0 = 0;         // step 6. flush GPIO setup
   *AUX_MU_CNTL = 3;       // enable Tx, Rx
 }
 
