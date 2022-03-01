@@ -1,12 +1,16 @@
 
 #include "uart.h"
+#include "mbox.h"
 #include <string.h>
+#include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal$ "
 #define CMD_HELP    "help"
 #define CMD_HELLO   "hello"
 #define CMD_REBOOT  "reboot"
 #define CMD_LSHW    "lshw"
+
+static void show_hardware_info();
 
 void main()
 {
@@ -43,7 +47,7 @@ void main()
         uart_printf(CMD_HELP   "\t: print this help menu\r\n");
         uart_printf(CMD_HELLO  "\t: print Hello World!\r\n");
         uart_printf(CMD_REBOOT "\t: reboot the device\r\n");
-        uart_printf(CMD_LSHW   "\t: printf hardware info acquired from mailbox\r\n");
+        uart_printf(CMD_LSHW   "\t: print hardware info acquired from mailbox\r\n");
       }
       else if(strcmp(input_s, CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -51,6 +55,7 @@ void main()
       else if(strcmp(input_s, CMD_REBOOT) == 0){
       }
       else if(strcmp(input_s, CMD_LSHW) == 0){
+        show_hardware_info();
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
@@ -60,4 +65,15 @@ void main()
       uart_printf(MACHINE_NAME);
     }
   }
+}
+
+static void show_hardware_info(){
+  uint32_t board_rev=0;
+  uint32_t *mem_start_addr = 0;
+  uint32_t mem_size = 0;
+  mbox_board_rev(&board_rev);
+  mbox_arm_mem_info(&mem_start_addr, &mem_size);
+  uart_printf("board_rev=0x%08X\r\n", board_rev);
+  uart_printf("mem_start_addr=0x%08X\r\n", mem_start_addr);
+  uart_printf("mem_size=0x%08X\r\n", mem_size);
 }
