@@ -40,7 +40,7 @@ void uart_init()
   *GPFSEL1 = r;
 
   // Set GPIO14, 15 to no pull up/down. Follow the steps of p.101, BCM2837 datasheet
-  *GPPUD = 0x00;          // step 1. no pull up, no pull down
+  *GPPUD = GPPUD_PULL_UP;   // step 1. set pull up, down or none
   WAIT_TICKS(r, 150);       // step 2. wait 150 ticks for signal to set-up
   *GPPUDCLK0 = (1<<14) | (1<<15); // step 3. select clock for GPIO14, 15
   WAIT_TICKS(r, 150);       // step 4. wait 150 ticks for signal to hold

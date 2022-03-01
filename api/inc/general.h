@@ -24,6 +24,10 @@
 #define GPPUDCLK0       ((volatile unsigned int*)(MMIO_BASE+0x00200098))
 #define GPPUDCLK1       ((volatile unsigned int*)(MMIO_BASE+0x0020009C))
 
+#define GPPUD_NO_PULL   0x00 // Refer to p.101, BCM2835 datasheet
+#define GPPUD_PULL_DOWN 0x01
+#define GPPUD_PULL_UP   0x02
+
 #define WAIT_TICKS(cnt, tk) {cnt = tk; while(cnt--) { asm volatile("nop"); }}
 
 void reset(int tick);
