@@ -2,7 +2,7 @@ $(info $(SHELL))
 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
-CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles
+CFLAGS = -Wall -O2 -ffreestanding -nostdinc -nostdlib -nostartfiles -static
 TOOL_CHAIN_PREFIX = aarch64-none-elf
 CC = $(TOOL_CHAIN_PREFIX)-gcc
 LD = $(TOOL_CHAIN_PREFIX)-ld

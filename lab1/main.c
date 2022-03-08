@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MACHINE_NAME "rpi3-baremetal$ "
+#define MACHINE_NAME "rpi3-baremetal-lab1$ "
 #define CMD_HELP    "help"
 #define CMD_HELLO   "hello"
 #define CMD_REBOOT  "reboot"
@@ -22,7 +22,8 @@ void main()
   uart_init();
 
   // say hello
-  uart_printf("Welcome------------------------\r\n");
+  uart_printf("\r\n\r\n");
+  uart_printf("Welcome------------------------ lab 1\r\n");
   uart_printf(MACHINE_NAME);
 
   while(1) {
