@@ -12,6 +12,7 @@
 #define CMD_LSHW    "lshw"
 
 static void show_hardware_info();
+extern int sscanf_(const char *ibuf, const char *fmt, ...);
 
 void main()
 {
@@ -20,6 +21,12 @@ void main()
 
   // set up serial console
   uart_init();
+
+  // sscanf test
+  int temp=0, hum=0, neg=0;
+  int n = 0;
+  n = sscanf_("temp=221, hum=+108, neg=-10, string=yoyo", "temp=%d, hum=%d, neg=%d, string=%s", &temp, &hum, &neg, input_s);
+  uart_printf("sscanf_: n=%d temp=%d, hum=%d, neg=%d, string=%s\r\n", n, temp, hum, neg, input_s);
 
   // say hello
   uart_printf("\r\n\r\n");
