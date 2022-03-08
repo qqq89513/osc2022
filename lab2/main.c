@@ -17,7 +17,6 @@ extern int sscanf_(const char *ibuf, const char *fmt, ...);
 void main()
 {
   char input_s[32];
-  int index = 0;
 
   // set up serial console
   uart_init();
@@ -31,27 +30,15 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2\r\n");
-  uart_printf(MACHINE_NAME);
 
   while(1) {
-    char temp = uart_getc();
 
     // Read cmd
-    if(temp == '\b' && index > 0){           // backspace implementation
-      uart_printf("\b \b");
-      index--;
-      input_s[index] = '\0';
-    }
-    else if(temp != '\b' && temp != '\n'){
-      uart_send(temp); // echos
-      input_s[index] = temp;
-      index++;
-    }
-    // Execute cmd
-    else if(temp == '\n'){
-      input_s[index] = '\0';
-      uart_printf("\r\n");
+    uart_printf(MACHINE_NAME);
+    uart_gets_n(sizeof(input_s), input_s, 1);
 
+    // Execute cmd
+    if(strlen(input_s) > 0){
       if     (strcmp(input_s, CMD_HELP) == 0){
         uart_printf(CMD_HELP   "\t: print this help menu\r\n");
         uart_printf(CMD_HELLO  "\t: print Hello World!\r\n");
@@ -71,10 +58,6 @@ void main()
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
-
-      // Ready for next cmd
-      index = 0;
-      uart_printf(MACHINE_NAME);
     }
   }
 }
