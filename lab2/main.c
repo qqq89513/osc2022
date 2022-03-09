@@ -25,12 +25,6 @@ void main()
   // set up serial console
   uart_init();
 
-  // sscanf test
-  int temp=0, hum=0, neg=0;
-  int n = 0;
-  n = sscanf_("temp=221, hum=+108, neg=-10, string=yoyo", "temp=%d, hum=%d, neg=%d, string=%s", &temp, &hum, &neg, input_s);
-  uart_printf("sscanf_: n=%d temp=%d, hum=%d, neg=%d, string=%s\r\n", n, temp, hum, neg, input_s);
-
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2\r\n");
@@ -44,10 +38,11 @@ void main()
     // Execute cmd
     if(strlen(input_s) > 0){
       if     (strcmp(input_s, CMD_HELP) == 0){
-        uart_printf(CMD_HELP   "\t: print this help menu\r\n");
-        uart_printf(CMD_HELLO  "\t: print Hello World!\r\n");
-        uart_printf(CMD_REBOOT "\t: reboot the device\r\n");
-        uart_printf(CMD_LSHW   "\t: print hardware info acquired from mailbox\r\n");
+        uart_printf(CMD_HELP   "\t\t: print this help menu\r\n");
+        uart_printf(CMD_HELLO  "\t\t: print Hello World!\r\n");
+        uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
+        uart_printf(CMD_LSHW   "\t\t: print hardware info acquired from mailbox\r\n");
+        uart_printf(CMD_LKR_UART "\t: Load kernel through uart\r\n");
       }
       else if(strcmp(input_s, CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -100,7 +95,7 @@ static void load_kernel_uart(){
   else{
     uart_printf("Receiving %lu bytes...\n", image_size);
     for(uint64_t i=0; i<image_size; i++){
-      addr_kernel[i] = uart_getc();
+      addr_kernel[i] = uart_read_byte();
     }
     bytes_to_print = image_size > 20 ? 20 : image_size;
     uart_printf("%lu of bytes received from uart. ", image_size);

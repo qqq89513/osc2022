@@ -91,6 +91,16 @@ char uart_getc() {
   return r;
 }
 
+uint8_t uart_read_byte(){
+  uint8_t r;
+  // wait until something is in the buffer
+  while(!(*AUX_MU_LSR&0x01));
+
+  // read it and return
+  r = (char)(*AUX_MU_IO);
+  return r;
+}
+
 /**
  * Display a string
  */

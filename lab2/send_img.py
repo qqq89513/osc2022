@@ -1,13 +1,20 @@
-from curses import baudrate
 import serial
-import time
 
+def echo_lines_until_timeout(ser: serial.Serial):
+  line = ser.readline()
+  while line:
+    print(f'Reponse from UART:{line}')
+    line = ser.readline()
+
+# Parameters
 IMAGE_PATH = '../lab1/build/kernel8.img'
 COM_NAME = 'COM36'
 
+# Open serial
 ser = serial.Serial()
 ser.port = COM_NAME
 ser.baudrate = 115200
+ser.timeout = 3
 ser.open()
 
 # Clear buffer
@@ -29,31 +36,23 @@ ser.write(b'\b\blkr_uart\n')
 ser.write(bytes(f'{file_size}\n', 'ansi'))
 ser.flush()
 print(f'{IMAGE_PATH} size = {file_size}\n')
-line = ser.readline()
-print(f'Reponse from UART:{line}\n')
-ser.flush()
+echo_lines_until_timeout(ser)
 
 # Send file
 print(f'File transmitting...')
 ser.write(arr_to_send)
 ser.flush()
 print(f'File transmitted.')
-line = ser.readline()
-print(f'Reponse from UART:{line}\n')
-line = ser.readline()
-print(f'Reponse from UART:{line}\n')
-line = ser.readline()
-print(f'Reponse from UART:{line}\n')
+echo_lines_until_timeout(ser)
 
 # Output last 10 byte of file
 arr_int = [x for x in arr_to_send]
 print(f'First 20 bytes of {IMAGE_PATH} (HEX)= ', end='')
 for b in arr_int[:20]:
   print("{:02X} ".format(b), end='')
+print('')
 
+# Receive and print remaining character
+echo_lines_until_timeout(ser)
 
-temp = ser.read()
-while temp: # Break for b''
-  time.sleep(0.01)
-  print(temp.decode('ansi'), end='')
-  temp = ser.read(1)
+print("Python script exits here.")
