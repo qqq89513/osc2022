@@ -2,6 +2,8 @@
 #include "uart.h"
 #include "mbox.h"
 #include "general.h"
+#include "diy_sscanf.h"
+#include "cpio.h"
 #include <string.h>
 #include <stdint.h>
 
@@ -16,7 +18,6 @@
 
 static void show_hardware_info();
 static void load_kernel_uart();
-extern int sscanf_(const char *ibuf, const char *fmt, ...);
 
 void main()
 {
@@ -28,6 +29,8 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2\r\n");
+
+  cpio_parse(CPIO_ADDR);
 
   while(1) {
 
