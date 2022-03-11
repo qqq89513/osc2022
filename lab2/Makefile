@@ -41,8 +41,9 @@ clean:
 	rm build/ -r
 
 run:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -kernel $(OUTPUT_DIR)/bootloader.img
+	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -kernel $(OUTPUT_DIR)/bootloader.img
 
 flash:
 	cp $(OUTPUT_DIR)/bootloader.img /D/bootloader.img
+	cp initramfs.cpio /D/initramfs.cpio
 	cp config.txt /D/config.txt
