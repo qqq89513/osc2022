@@ -43,7 +43,7 @@ void main()
 
     // Read cmd
     uart_printf(MACHINE_NAME);
-    uart_gets_n(sizeof(input_s), input_s, 1);
+    uart_gets_n(32, input_s, 1);
     args_cnt = spilt_strings(args, input_s, " ");
 
     // Execute cmd
