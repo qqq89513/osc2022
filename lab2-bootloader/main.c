@@ -7,17 +7,17 @@
 #include "cpio.h"
 #include <stdint.h>
 
-#define MACHINE_NAME "rpi3-baremetal-lab2$ "
+#define MACHINE_NAME "rpi3-baremetal-lab2-bootloader$ "
 #define CMD_HELP    "help"
 #define CMD_HELLO   "hello"
 #define CMD_REBOOT  "reboot"
 #define CMD_LSHW    "lshw"
-#define CMD_LS       "ls"
-#define CMD_CAT      "cat"
+#define CMD_LKR_UART "lkr_uart"  // load kernel from uart
 
 #define ADDR_IMAGE_START 0x80000
 
 static void show_hardware_info();
+static void load_kernel_uart();
 static int spilt_strings(char** str_arr, char* str, char* deli);
 
 void main()
@@ -31,7 +31,7 @@ void main()
 
   // say hello
   uart_printf("\r\n\r\n");
-  uart_printf("Welcome------------------------ lab 2\r\n");
+  uart_printf("Welcome------------------------ lab 2 -- bootloader\r\n");
 
   cpio_parse(CPIO_ADDR);
 
@@ -49,8 +49,7 @@ void main()
         uart_printf(CMD_HELLO  "\t\t: print Hello World!\r\n");
         uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
         uart_printf(CMD_LSHW   "\t\t: print hardware info acquired from mailbox\r\n");
-        uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
-        uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
+        uart_printf(CMD_LKR_UART "\t: Load kernel through uart\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -63,12 +62,8 @@ void main()
       else if(strcmp_(args[0], CMD_LSHW) == 0){
         show_hardware_info();
       }
-      else if(strcmp_(args[0], CMD_LS) == 0){
-        cpio_ls();
-      }
-      else if(strcmp_(args[0], CMD_CAT) == 0){
-        if(args_cnt > 1)
-          cpio_cat(args[1]);
+      else if(strcmp_(args[0], CMD_LKR_UART) == 0){
+        load_kernel_uart();
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
@@ -97,4 +92,40 @@ static void show_hardware_info(){
   uart_printf("board_rev=0x%08X\r\n", board_rev);
   uart_printf("mem_start_addr=0x%08X\r\n", mem_start_addr);
   uart_printf("mem_size=0x%08X\r\n", mem_size);
+}
+
+static void load_kernel_uart(){
+  char input_s[32];
+  int bytes_to_print = 0;
+  uint8_t* addr_kernel = (uint8_t*)ADDR_IMAGE_START;
+  uint64_t image_size = 0;
+
+  // Read size
+  uart_printf("Image size=");
+  uart_gets_n(sizeof(input_s), input_s, 1);
+  sscanf_(input_s, "%lu", &image_size);
+
+  // Check size
+  if(image_size == 0){
+    uart_printf("Error, image size cannot be 0\r\n");
+    return;
+  }
+  // Read binary from uart
+  else{
+    uart_printf("Receiving %lu bytes...\n", image_size);
+    for(uint64_t i=0; i<image_size; i++){
+      addr_kernel[i] = uart_read_byte();
+    }
+    bytes_to_print = image_size > 20 ? 20 : image_size;
+    uart_printf("%lu of bytes received from uart. ", image_size);
+    uart_printf("First %d bytes received (HEX): ", bytes_to_print);
+    for(uint64_t i=0; i<bytes_to_print; i++)
+      uart_printf("%02X ", addr_kernel[i]);
+    uart_printf("\r\n");
+
+    // Jump to new kernel
+    volatile void (*jump_to_new_kernel) (void) = (void (*) (void))  (addr_kernel);
+    jump_to_new_kernel();
+    while(1);
+  }
 }

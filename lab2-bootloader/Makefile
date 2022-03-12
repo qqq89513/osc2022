@@ -17,7 +17,7 @@ LD = $(TOOL_CHAIN_PREFIX)-gcc
 SIZE = $(TOOL_CHAIN_PREFIX)-size
 OBJCOPY = $(TOOL_CHAIN_PREFIX)-objcopy
 
-all: create_dir kernel8.img
+all: create_dir bootloader.img
 build: all
 b: build
 c: clean
@@ -32,18 +32,18 @@ $(BUILD_DIR)/start.o: start.S
 $(BUILD_DIR)/%.o: %.c
 	$(CC)  $(CCFLAGS) $(INCLUDES) -c $< -o $@
 
-kernel8.img: $(BUILD_DIR)/start.o $(OBJS)
-	$(LD) $(LDFLAGS) $(BUILD_DIR)/start.o $(OBJS) -o $(OUTPUT_DIR)/kernel8.elf
-	$(OBJCOPY) -O binary $(OUTPUT_DIR)/kernel8.elf $(OUTPUT_DIR)/kernel8.img
-	$(SIZE) $(OUTPUT_DIR)/kernel8.elf
+bootloader.img: $(BUILD_DIR)/start.o $(OBJS)
+	$(LD) $(LDFLAGS) $(BUILD_DIR)/start.o $(OBJS) -o $(OUTPUT_DIR)/bootloader.elf
+	$(OBJCOPY) -O binary $(OUTPUT_DIR)/bootloader.elf $(OUTPUT_DIR)/bootloader.img
+	$(SIZE) $(OUTPUT_DIR)/bootloader.elf
 
 clean:
 	rm build/ -r
 
 run:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -kernel $(OUTPUT_DIR)/kernel8.img
+	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -kernel $(OUTPUT_DIR)/bootloader.img
 
 flash:
-	cp $(OUTPUT_DIR)/kernel8.img /F/kernel8.img
+	cp $(OUTPUT_DIR)/bootloader.img /F/bootloader.img
 	cp initramfs.cpio /F/initramfs.cpio
 	cp config.txt /F/config.txt

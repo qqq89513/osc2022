@@ -1,7 +1,7 @@
 
 SECTIONS
 {
-  . = 0x80000;               /* set . counter to Initial address */
+  . = 0x60000;               /* set . counter to Initial address, 0x8000(O), 0x7FFF(O), 0x0000(X) */
   . = ALIGN(8);
   .text : { *(.text*) }      /* text section */
   .data : {                  /* Data section */
