@@ -5,7 +5,6 @@
 #include "diy_sscanf.h"
 #include "diy_string.h"
 #include "cpio.h"
-#include "diy_malloc.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal-lab2-bootloader$ "
@@ -23,12 +22,9 @@ static int spilt_strings(char** str_arr, char* str, char* deli);
 
 void main()
 {
-  char *input_s;
-  char **args;
+  char input_s[32];
+  char *args[10];
   int args_cnt = 0;
-
-  input_s = simple_malloc(sizeof(char) * 32);
-  args = simple_malloc(sizeof(char*) * 10);
 
   // set up serial console
   uart_init();
@@ -36,8 +32,6 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2 -- bootloader\r\n");
-
-  cpio_parse(CPIO_ADDR);
 
   while(1) {
 
