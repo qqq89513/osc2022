@@ -40,7 +40,8 @@ typedef struct __cpio_file{
 } cpio_file_ll; // ll for linked list
 
 int cpio_parse(void *addr);
-
+void cpio_ls();
+int cpio_cat(char *file_name);
 
 #ifdef __cplusplus
 }
