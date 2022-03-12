@@ -3,8 +3,8 @@
 #include "mbox.h"
 #include "general.h"
 #include "diy_sscanf.h"
+#include "diy_string.h"
 #include "cpio.h"
-#include <string.h>
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal-lab2$ "
@@ -45,8 +45,8 @@ void main()
     args_cnt = spilt_strings(args, input_s, " ");
 
     // Execute cmd
-    if(strlen(args[0]) > 0){
-      if     (strcmp(args[0], CMD_HELP) == 0){
+    if(strlen_(args[0]) > 0){
+      if     (strcmp_(args[0], CMD_HELP) == 0){
         uart_printf(CMD_HELP   "\t\t: print this help menu\r\n");
         uart_printf(CMD_HELLO  "\t\t: print Hello World!\r\n");
         uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
@@ -55,24 +55,24 @@ void main()
         uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
       }
-      else if(strcmp(args[0], CMD_HELLO) == 0){
+      else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
       }
-      else if(strcmp(args[0], CMD_REBOOT) == 0){
+      else if(strcmp_(args[0], CMD_REBOOT) == 0){
         uart_printf("Rebooting...\r\n");
         reset(1000);
         while(1);
       }
-      else if(strcmp(args[0], CMD_LSHW) == 0){
+      else if(strcmp_(args[0], CMD_LSHW) == 0){
         show_hardware_info();
       }
-      else if(strcmp(args[0], CMD_LKR_UART) == 0){
+      else if(strcmp_(args[0], CMD_LKR_UART) == 0){
         load_kernel_uart();
       }
-      else if(strcmp(args[0], CMD_LS) == 0){
+      else if(strcmp_(args[0], CMD_LS) == 0){
         cpio_ls();
       }
-      else if(strcmp(args[0], CMD_CAT) == 0){
+      else if(strcmp_(args[0], CMD_CAT) == 0){
         if(args_cnt > 1)
           cpio_cat(args[1]);
       }
@@ -85,11 +85,11 @@ void main()
 static int spilt_strings(char** str_arr, char* str, char* deli){
   int count = 0;
   // Spilt str by specified delimeter
-  str_arr[0] = strtok(str, deli);
+  str_arr[0] = strtok_(str, deli);
   count = 0;
   while(str_arr[count] != NULL){
     count++;
-    str_arr[count] = strtok (NULL, deli);
+    str_arr[count] = strtok_(NULL, deli);
   }
   return count;
 }

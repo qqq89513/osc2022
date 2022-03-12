@@ -1,6 +1,6 @@
 
 #include <stdint.h>
-#include <string.h>
+#include "diy_string.h"
 #include "cpio.h"
 #include "diy_sscanf.h"
 #include "uart.h"
@@ -10,9 +10,9 @@ static cpio_file_ll files_arr[CPIO_MAX_FILES];
 
 
 static uint32_t header_get_mem(uint8_t* member, size_t size){
-  char str_buf[32];
+  static char str_buf[32];
   uint32_t ret = 0;
-  memcpy(str_buf, member, size);
+  memcpy_(str_buf, member, size);
   str_buf[size] = '\0';
   if(sscanf_(str_buf, "%8X", &ret) != 1)
     return -1;
@@ -55,7 +55,7 @@ int cpio_parse(void *addr){
     file->data_ptr  = data_ptr;
     file->file_size = file_size;
     file->pathname  = file_name;
-    if(strcmp(CPIO_END_RECORD, (const char*)file_name) != 0){
+    if(strcmp_(CPIO_END_RECORD, (const char*)file_name) != 0){
       header = (cpio_newc_header_t*)( data_ptr + file_size + pad_to_4(file_size) );
       file->next = file + 1; // should be malloc() here.
       file = file->next;
@@ -82,7 +82,7 @@ int cpio_cat(char *file_name){
 
   // Traverse the linked list
   while(file->next != NULL){
-    if(strcmp(file_name, (char*)file->pathname) == 0){
+    if(strcmp_(file_name, (char*)file->pathname) == 0){
       // Dump for debug
       for(int i = 0; i < file->file_size; i++) uart_printf("%c", file->data_ptr[i]);
       uart_printf("\r\n");

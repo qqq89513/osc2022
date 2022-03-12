@@ -60,7 +60,7 @@
 
 #include "diy_sscanf.h"
 #include <stdarg.h>
-#include <string.h>
+#include "diy_string.h"
 #include <ctype.h>
 #include <stdint.h>
 typedef unsigned char u_char;
@@ -142,7 +142,7 @@ int vsscanf_(const char *inp, char const *fmt0, va_list ap){
   static short basefix[17] =
     { 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 
-  inr = strlen(inp);
+  inr = strlen_(inp);
   
   nassigned = 0;
   nconversions = 0;
@@ -328,7 +328,7 @@ literal:
         }
         nread += sum;
       } else {
-        bcopy(inp, va_arg(ap, char *), width);
+        memcpy_(va_arg(ap, char *), inp, width);
         inr -= width;
         inp += width;
         nread += width;
@@ -777,7 +777,7 @@ static const u_char *__sccl(char *tab, const u_char *fmt)
     v = 0;    /* default => reject */
 
   /* XXX: Will not work if sizeof(tab*) > sizeof(char) */
-  (void) memset(tab, v, 256);
+  (void) memset_(tab, v, 256);
 
   if (c == 0)
     return (fmt - 1);/* format ended before closing ] */
