@@ -37,10 +37,6 @@ _start:
     b       1b
 2:  // cpu id == 0
 
-    // set top of stack just before our code (stack grows to a lower address per AAPCS64)
-    ldr     x1, =_start
-    mov     sp, x1
-
     // clear bss
     ldr     x1, =_bss_start
     ldr     w2, =_bss_size
@@ -48,8 +44,14 @@ _start:
     str     xzr, [x1], #8
     sub     w2, w2, #1
     cbnz    w2, 3b
+    
+    // set top of stack to exec address
+    ldr     x1, =0x60000
+    mov     sp, x1
+    // use c domain to do relocation
+    bl      self_relocate               // __start__ = 0x80000
 
-    // jump to C code, should not return
-4:  bl      main
+    // jump to relocated main()
+4:  bl      (main - 0x80000 + 0x60000)  // __start__ = 0x60000
     // for failsafe, halt this core too
     b       1b

@@ -20,11 +20,12 @@ static void show_hardware_info();
 static void load_kernel_uart();
 static int spilt_strings(char** str_arr, char* str, char* deli);
 
+extern uint64_t __start__;    // defined in link.ld
+
 void main()
 {
   char input_s[32];
   char *args[10];
-  int args_cnt = 0;
 
   // set up serial console
   uart_init();
@@ -32,13 +33,14 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2 -- bootloader\r\n");
+  uart_printf("After relocation: __start__=0x%p, main=0x%p\r\n", &__start__, main);
 
   while(1) {
 
     // Read cmd
     uart_printf(MACHINE_NAME);
     uart_gets_n(sizeof(input_s), input_s, 1);
-    args_cnt = spilt_strings(args, input_s, " ");
+    spilt_strings(args, input_s, " ");
 
     // Execute cmd
     if(strlen_(args[0]) > 0){
