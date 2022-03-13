@@ -1,20 +1,34 @@
 import serial
+import sys
 
-def echo_lines_until_timeout(ser: serial.Serial):
+def echo_lines_until_timeout(ser: serial.Serial, search_for: str=None):
   line = ser.readline()
   while line:
     print(f'Reponse from UART:{line}')
     line = ser.readline()
+    if search_for != None:
+      index = line.decode('ansi').find(search_for)
+      if index != -1:
+        return index
+  return -1
 
-# Parameters
-IMAGE_PATH = '../lab1/build/kernel8.img'
-COM_NAME = 'COM36'
+# Get Parameters
+arg_cnt = len(sys.argv)
+if arg_cnt == 1:
+  print("Please specify file to send.")
+  exit()
+elif arg_cnt == 2:
+  IMAGE_PATH = sys.argv[1]
+  COM_NAME = 'COM36'
+else: # arg_cnt >=3
+  IMAGE_PATH = sys.argv[1]
+  COM_NAME = sys.argv[2]
 
 # Open serial
 ser = serial.Serial()
 ser.port = COM_NAME
 ser.baudrate = 115200
-ser.timeout = 3
+ser.timeout = 1
 ser.open()
 
 # Clear buffer
@@ -36,7 +50,10 @@ ser.write(b'\b\blkr_uart\n')
 ser.write(bytes(f'{file_size}\n', 'ansi'))
 ser.flush()
 print(f'{IMAGE_PATH} size = {file_size}\n')
-echo_lines_until_timeout(ser)
+ret = echo_lines_until_timeout(ser, f"Receiving {file_size} bytes...")
+if ret == -1:
+  print("Failed to handshake with rpi uart bootloader.")
+  exit()
 
 # Send file
 print(f'File transmitting...')
