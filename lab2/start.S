@@ -37,6 +37,9 @@ _start:
     b       1b
 2:  // cpu id == 0
 
+    // DTB load address is kept in x0 by GPU. Save it somewhere else
+    mov     x28, x0
+
     // set top of stack just before our code (stack grows to a lower address per AAPCS64)
     ldr     x1, =_start
     mov     sp, x1
@@ -50,6 +53,7 @@ _start:
     cbnz    w2, 3b
 
     // jump to C code, should not return
-4:  bl      main
+4:  mov     x0, x28    // Put dtb address back as a argument of main
+    bl      main
     // for failsafe, halt this core too
     b       1b

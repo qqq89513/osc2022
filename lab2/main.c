@@ -20,8 +20,8 @@
 
 static void show_hardware_info();
 static int spilt_strings(char** str_arr, char* str, char* deli);
-
-void main()
+extern uint64_t _start;
+void main(void *dtb_addr)
 {
   char *input_s;
   char **args;
@@ -36,6 +36,8 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2\r\n");
+
+  uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
 
   cpio_parse(CPIO_ADDR);
 

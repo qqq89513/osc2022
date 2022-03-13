@@ -41,9 +41,13 @@ clean:
 	rm build/ -r
 
 run:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -kernel $(OUTPUT_DIR)/kernel8.img
+	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/kernel8.img
 
 flash:
 	cp $(OUTPUT_DIR)/kernel8.img /F/kernel8.img
 	cp initramfs.cpio /F/initramfs.cpio
+	cp bcm2710-rpi-3-b-plus.dtb /F/bcm2710-rpi-3-b-plus.dtb
 	cp config.txt /F/config.txt
+
+flash_py:
+	python ../lab2-bootloader/send_img.py ./build/kernel8.img
