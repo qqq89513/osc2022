@@ -17,12 +17,11 @@
 #define ADDR_IMAGE_START 0x80000
 
 static void show_hardware_info();
-static void load_kernel_uart();
+static void load_kernel_uart(void *arg_to_main);
 static int spilt_strings(char** str_arr, char* str, char* deli);
 
 extern uint64_t __start__;    // defined in link.ld
-
-void main()
+void main(void* dtb_addr)
 {
   char input_s[32];
   char *args[10];
@@ -33,7 +32,7 @@ void main()
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2 -- bootloader\r\n");
-  uart_printf("After relocation: __start__=0x%p, main=0x%p\r\n", &__start__, main);
+  uart_printf("After relocation: __start__=0x%p, main=0x%p, dtb_addr=%p\r\n", &__start__, main, dtb_addr);
 
   while(1) {
 
@@ -63,7 +62,7 @@ void main()
         show_hardware_info();
       }
       else if(strcmp_(args[0], CMD_LKR_UART) == 0){
-        load_kernel_uart();
+        load_kernel_uart(dtb_addr);
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
@@ -94,7 +93,7 @@ static void show_hardware_info(){
   uart_printf("mem_size=0x%08X\r\n", mem_size);
 }
 
-static void load_kernel_uart(){
+static void load_kernel_uart(void *arg_to_main){
   char input_s[32];
   int bytes_to_print = 0;
   uint8_t* addr_kernel = (uint8_t*)ADDR_IMAGE_START;
@@ -124,8 +123,8 @@ static void load_kernel_uart(){
     uart_printf("\r\n");
 
     // Jump to new kernel
-    volatile void (*jump_to_new_kernel) (void) = (void (*) (void))  (addr_kernel);
-    jump_to_new_kernel();
+    volatile void (*jump_to_new_kernel) (void*) = (void (*) (void*))  (addr_kernel);
+    jump_to_new_kernel(arg_to_main);
     while(1);
   }
 }

@@ -41,9 +41,10 @@ clean:
 	rm build/ -r
 
 run:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -kernel $(OUTPUT_DIR)/bootloader.img
+	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/bootloader.img
 
 flash:
 	cp $(OUTPUT_DIR)/bootloader.img /F/bootloader.img
 	cp initramfs.cpio /F/initramfs.cpio
+	cp bcm2710-rpi-3-b-plus.dtb /F/bcm2710-rpi-3-b-plus.dtb
 	cp config.txt /F/config.txt
