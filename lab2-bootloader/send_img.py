@@ -1,4 +1,5 @@
 import serial
+import time
 import sys
 
 def echo_lines_until_timeout(ser: serial.Serial, search_for: str=None):
@@ -7,10 +8,17 @@ def echo_lines_until_timeout(ser: serial.Serial, search_for: str=None):
     print(f'Reponse from UART:{line}')
     line = ser.readline()
     if search_for != None:
-      index = line.decode('ansi').find(search_for)
+      index = str(line).find(search_for)
       if index != -1:
         return index
   return -1
+
+def uart_file_size_handshake(ser: serial.Serial):
+  ser.write(b'\b\blkr_uart\n')
+  ser.write(bytes(f'{file_size}\n', 'ansi'))
+  ser.flush()
+  print(f'{IMAGE_PATH} size = {file_size}\n')
+  return echo_lines_until_timeout(ser, f"Receiving {file_size} bytes...")
 
 # Get Parameters
 arg_cnt = len(sys.argv)
@@ -46,14 +54,16 @@ with open(IMAGE_PATH, 'rb') as img_file:
 file_size = len(arr_to_send)
 
 # Send file length
-ser.write(b'\b\blkr_uart\n')
-ser.write(bytes(f'{file_size}\n', 'ansi'))
-ser.flush()
-print(f'{IMAGE_PATH} size = {file_size}\n')
-ret = echo_lines_until_timeout(ser, f"Receiving {file_size} bytes...")
+ret = uart_file_size_handshake(ser)
 if ret == -1:
-  print("Failed to handshake with rpi uart bootloader.")
-  exit()
+  print("Failed to handshake with rpi uart bootloader. Rebooting to retry...")
+  ser.write(b'\b\breboot\n')
+  time.sleep(6)
+  ret = uart_file_size_handshake(ser)
+  if ret == -1:
+    print("Failed to handshake with rpi uart bootloader.")
+    print("Python script exits here")
+    exit()
 
 # Send file
 print(f'File transmitting...')
@@ -72,4 +82,5 @@ print('')
 # Receive and print remaining character
 echo_lines_until_timeout(ser)
 
+print("File successfully transmitted.")
 print("Python script exits here.")
