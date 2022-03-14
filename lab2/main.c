@@ -6,13 +6,15 @@
 #include "diy_string.h"
 #include "cpio.h"
 #include "diy_malloc.h"
+#include "fdtb.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal-lab2$ "
-#define CMD_HELP    "help"
-#define CMD_HELLO   "hello"
-#define CMD_REBOOT  "reboot"
-#define CMD_LSHW    "lshw"
+#define CMD_HELP     "help"
+#define CMD_HELLO    "hello"
+#define CMD_REBOOT   "reboot"
+#define CMD_LSHW     "lshw"
+#define CMD_LSDEV    "lsdev"
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
 
@@ -39,6 +41,7 @@ void main(void *dtb_addr)
 
   uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
 
+  fdtb_parse(dtb_addr, 0);
   cpio_parse(CPIO_ADDR);
 
   while(1) {
@@ -75,6 +78,9 @@ void main(void *dtb_addr)
       else if(strcmp_(args[0], CMD_CAT) == 0){
         if(args_cnt > 1)
           cpio_cat(args[1]);
+      }
+      else if(strcmp_(args[0], CMD_LSDEV) == 0){
+        fdtb_parse(dtb_addr, 1);
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
