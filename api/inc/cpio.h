@@ -39,6 +39,7 @@ typedef struct __cpio_file{
   struct __cpio_file* next;
 } cpio_file_ll; // ll for linked list
 
+typedef int (cpio_parse_func) (void*); // function of ( int cpio_parse(void *addr); )
 int cpio_parse(void *addr);
 void cpio_ls();
 int cpio_cat(char *file_name);

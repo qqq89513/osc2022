@@ -1,6 +1,7 @@
 
 #include "fdtb.h"
 #include "uart.h"
+#include "cpio.h"
 #include "diy_string.h"
 
 #define FDT_MAGIC         0xD00DFEED
@@ -12,13 +13,15 @@
 #define FDT_TK_NOP        0X00000004
 #define FDT_TK_END        0X00000009
 
+#define FDT_CPIO_INITRAMFS_PROPNAME "linux,initrd-start"
+
 static uint64_t pad_to_4(void *num);
 static void dump(void *arr, const uint32_t len);
 static uint32_t rev32(uint32_t val);
 static uint64_t endian_rev(void *input, int dtype_size);
 
 
-void fdtb_parse(void *dtb_addr, int print){
+void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
   fdt_header *header =  (fdt_header*) dtb_addr;
   uint8_t *structure_block_end = (uint8_t*)header + rev32(header->off_dt_struct) + rev32(header->size_dt_struct);
   if(print) uart_printf("[Debug] magic=0x%08X, totalsize=0x%08X, off_dt_struct=0x%08X, off_dt_strings=0x%08X, version=0x%08X\r\n",
@@ -58,6 +61,10 @@ void fdtb_parse(void *dtb_addr, int print){
         if(print) uart_printf("PROP_NODE  depth=%d, cur=%p, prop.len=%2d, .nameoff=0x%8X, propName=%s, propVal=%s\r\n", 
                       depth, cur, rev32(prop->len), rev32(prop->nameoff), propName, propVal);
         // TODO: Get linux,initrd-start start address here
+        if(!strcmp_(FDT_CPIO_INITRAMFS_PROPNAME, propName) && callback != NULL){
+          void *addr = (void*) (uint64_t) rev32( *((uint32_t*)propVal) );
+          (*callback) (addr);
+        }
         cur += rev32(prop->len);
         cur += pad_to_4(cur);
         break;

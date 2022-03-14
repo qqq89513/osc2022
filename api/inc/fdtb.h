@@ -8,6 +8,7 @@ extern "C" {
 
 
 #include <stdint.h>
+#include "cpio.h"
 
 typedef struct __fdt_header__ {
   uint32_t magic;
@@ -28,7 +29,7 @@ typedef struct __fdt_node_prop__{
 } fdt_node_prop;
 
 
-void fdtb_parse(void *dtb_addr, int print);
+void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback);
 
 #ifdef __cplusplus
 }

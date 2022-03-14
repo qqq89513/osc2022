@@ -14,9 +14,9 @@
 #define CMD_HELLO    "hello"
 #define CMD_REBOOT   "reboot"
 #define CMD_LSHW     "lshw"
-#define CMD_LSDEV    "lsdev"
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
+#define CMD_LSDEV    "lsdev"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -41,8 +41,7 @@ void main(void *dtb_addr)
 
   uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
 
-  fdtb_parse(dtb_addr, 0);
-  cpio_parse(CPIO_ADDR);
+  fdtb_parse(dtb_addr, 0, cpio_parse);
 
   while(1) {
 
@@ -60,6 +59,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_LSHW   "\t\t: print hardware info acquired from mailbox\r\n");
         uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
+        uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -80,7 +80,7 @@ void main(void *dtb_addr)
           cpio_cat(args[1]);
       }
       else if(strcmp_(args[0], CMD_LSDEV) == 0){
-        fdtb_parse(dtb_addr, 1);
+        fdtb_parse(dtb_addr, 1, NULL);
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
