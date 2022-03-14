@@ -101,6 +101,6 @@ static void show_hardware_info(){
   mbox_board_rev(&board_rev);
   mbox_arm_mem_info(&mem_start_addr, &mem_size);
   uart_printf("board_rev=0x%08X\r\n", board_rev);
-  uart_printf("mem_start_addr=0x%08X\r\n", mem_start_addr);
+  uart_printf("mem_start_addr=0x%p\r\n", mem_start_addr);
   uart_printf("mem_size=0x%08X\r\n", mem_size);
 }

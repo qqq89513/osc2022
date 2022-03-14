@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 void uart_init();
-void uart_printf(const char *fmt, ...);
+void uart_printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void uart_send(unsigned int c);
 char uart_getc();
 uint8_t uart_read_byte();
