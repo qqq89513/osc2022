@@ -44,6 +44,10 @@ _start:
     ldr     x1, =_start
     mov     sp, x1
 
+    // Set privilege from el2 to el1
+    bl from_el2_to_el1                  // set exeception level from el2 to el1. Next instruction executes in el1
+    // bl set_exception_vector_table    // set look up vector_table when exception raised
+
     // clear bss
     ldr     x1, =_bss_start
     ldr     w2, =_bss_size
@@ -52,8 +56,52 @@ _start:
     sub     w2, w2, #1
     cbnz    w2, 3b
 
+jump_to_main:
     // jump to C code, should not return
 4:  mov     x0, x28    // Put dtb address back as a argument of main
     bl      main
     // for failsafe, halt this core too
     b       1b
+
+/* 
+  Set exception level from EL2 to EL1
+  In default, rpi3 cpu runs in el2.
+  Call this function to set exeception level from el2 to el1.
+  1. Set hcr_el2 (Hypervisor Configuration Register)
+      
+  2. Set spsr_el2
+        (D,A,I,F) at bit# (9,8,7,6)，EL1h = 0b101, result in 1111000101 = 0x3c5
+        ref: https://kaiiiz.github.io/notes/nctu/osdi/lab3/exception-level-switch/
+        ref: http://www.lujun.org.cn/?p=1676
+  3. Set elr_el2 (Exception Link Register)
+        This is the address after exception handled.
+
+  4. Call eret
+        eret does 2 things: (mov cpsr, spsr_el2) and jumps to elr_el2
+*/
+from_el2_to_el1:
+    // make el0, el1 can use Floating point and Advanced SIMD
+    // this fixes printf (printf use stdargs, which access register q0~q7, and those are SIMD registers)
+    // ref: https://kaiiiz.github.io/notes/nctu/osdi/lab3/exception-level-switch/
+    // set cpacr_el1.FPEN = 0b11, where FPEN is at bits [21:20]
+    mov x1,        (0b11 << 20)
+    msr cpacr_el1, x1
+    
+    mov x1,        (1 << 31)    // EL1 & EL0 uses aarch64
+    msr hcr_el2,   x1
+    mov x1,        0x3c5        // EL1h (SPSel = 1) with interrupt disabled
+    msr spsr_el2,  x1           
+    msr elr_el2,   lr
+    ldr x1,        =_start      // load _start address to x1
+    msr sp_el1,    x1           // set stack of el1
+    eret                        // return to EL1
+
+/* 
+  set vbar_el1 register to exception_vector_table address. 
+  1. exception_vector_table address to x0 register
+  2. x0 register value to vbar_el1 status register 
+*/
+// set_exception_vector_table:
+//     adr x0, exception_vector_table
+//     msr vbar_el1, x0
+//     ret
