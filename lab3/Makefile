@@ -10,10 +10,10 @@ SRCS_asm = $(wildcard *.S)
 OBJS = $(addprefix $(BUILD_DIR)/, $(SRCS:.c=.o))
 OBJS_asm = $(addprefix $(BUILD_DIR)/, $(SRCS_asm:.S=.o))
 INCLUDES = -I ../api/inc/ -I ./
-CCFLAGS = -Wall -nostartfiles -ffreestanding -nostdlib
+CCFLAGS = -Wall -nostartfiles -ffreestanding -nostdlib -static
 # CCFLAGS = -nostartfiles -ffreestanding -mthumb -Wall -fdump-rtl-expand -specs=nano.specs --specs=rdimon.specs   -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
 ASMFLAGS = $(CCFLAGS)
-LDFLAGS = -T link.ld -nostartfiles -ffreestanding -static
+LDFLAGS = -T link.ld -nostartfiles -ffreestanding -nostdlib -static
 CCFLAGS_gdb = $(CCFLAGS) -ggdb
 ASMFLAGS_gdb = $(ASMFLAGS) -ggdb
 LDFLAGS_gdb = $(LDFLAGS) -ggdb

@@ -32,7 +32,6 @@
 #ifndef __DIY_PRINTF_H_
 #define __DIY_PRINTF_H_
 
-#include <stdarg.h>
 #include <stddef.h>
 
 
@@ -81,7 +80,7 @@ int sprintf_(char* buffer, const char* format, ...);
  *         is non-negative and less than count, the string has been completely written.
  */
 int  snprintf_(char* buffer, size_t count, const char* format, ...);
-int vsnprintf_(char* buffer, size_t count, const char* format, va_list va);
+int vsnprintf_(char* buffer, size_t count, const char* format, __builtin_va_list va);
 
 
 /**
@@ -90,7 +89,7 @@ int vsnprintf_(char* buffer, size_t count, const char* format, va_list va);
  * \param va A value identifying a variable arguments list
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
-int vprintf_(const char* format, va_list va);
+int vprintf_(const char* format, __builtin_va_list va);
 
 
 /**

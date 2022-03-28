@@ -59,9 +59,8 @@
  */
 
 #include "diy_sscanf.h"
-#include <stdarg.h>
 #include "diy_string.h"
-#include <ctype.h>
+#include "ctype_diy.h"
 #include <stdint.h>
 typedef unsigned char u_char;
 typedef uint64_t u_quad_t;
@@ -113,16 +112,16 @@ static int64_t strtoq_diy(const char *nptr, char **endptr, int base);
 static uint64_t strtouq_diy(const char *nptr, char **endptr, int base);
 
 int sscanf_(const char *ibuf, const char *fmt, ...){
-  va_list ap;
+  __builtin_va_list ap;
   int ret;
   
-  va_start(ap, fmt);
+  __builtin_va_start(ap, fmt);
   ret = vsscanf_(ibuf, fmt, ap);
-  va_end(ap);
+  __builtin_va_end(ap);
   return(ret);
 }
 
-int vsscanf_(const char *inp, char const *fmt0, va_list ap){
+int vsscanf_(const char *inp, char const *fmt0, __builtin_va_list ap){
   int inr;
   const u_char *fmt = (const u_char *)fmt0;
   int c;      /* character from format, or conversion */
@@ -263,15 +262,15 @@ literal:
       if (flags & SUPPRESS)  /* ??? */
         continue;
       if (flags & SHORTSHORT)
-        *va_arg(ap, char *) = nread;
+        *__builtin_va_arg(ap, char *) = nread;
       else if (flags & SHORT)
-        *va_arg(ap, short *) = nread;
+        *__builtin_va_arg(ap, short *) = nread;
       else if (flags & LONG)
-        *va_arg(ap, long *) = nread;
+        *__builtin_va_arg(ap, long *) = nread;
       else if (flags & LONGLONG)
-        *va_arg(ap, long long *) = nread;
+        *__builtin_va_arg(ap, long long *) = nread;
       else
-        *va_arg(ap, int *) = nread;
+        *__builtin_va_arg(ap, int *) = nread;
       continue;
     }
 
@@ -328,7 +327,7 @@ literal:
         }
         nread += sum;
       } else {
-        memcpy_(va_arg(ap, char *), inp, width);
+        memcpy_(__builtin_va_arg(ap, char *), inp, width);
         inr -= width;
         inp += width;
         nread += width;
@@ -357,7 +356,7 @@ literal:
         if (n == 0)
           goto match_failure;
       } else {
-        p0 = p = va_arg(ap, char *);
+        p0 = p = __builtin_va_arg(ap, char *);
         while (ccltab[(unsigned char)*inp]) {
           inr--;
           *p++ = *inp++;
@@ -394,7 +393,7 @@ literal:
         }
         nread += n;
       } else {
-        p0 = p = va_arg(ap, char *);
+        p0 = p = __builtin_va_arg(ap, char *);
         while (!isspace((int)(*inp))) {
           inr--;
           *p++ = *inp++;
@@ -540,18 +539,18 @@ literal:
         else
             res = strtouq_diy(buf, (char **)NULL, base);
         if (flags & POINTER)
-          *va_arg(ap, void **) =
+          *__builtin_va_arg(ap, void **) =
             (void *)(uintptr_t)res;
         else if (flags & SHORTSHORT)
-          *va_arg(ap, char *) = res;
+          *__builtin_va_arg(ap, char *) = res;
         else if (flags & SHORT)
-          *va_arg(ap, short *) = res;
+          *__builtin_va_arg(ap, short *) = res;
         else if (flags & LONG)
-          *va_arg(ap, long *) = res;
+          *__builtin_va_arg(ap, long *) = res;
         else if (flags & LONGLONG)
-          *va_arg(ap, long long *) = res;
+          *__builtin_va_arg(ap, long long *) = res;
         else
-          *va_arg(ap, int *) = res;
+          *__builtin_va_arg(ap, int *) = res;
         nassigned++;
       }
       nread += p - buf;

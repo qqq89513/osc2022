@@ -13,7 +13,10 @@
     "diy_malloc.h": "c",
     "fdtb.h": "c",
     "stdint.h": "c",
-    "stdint-gcc.h": "c"
+    "stdint-gcc.h": "c",
+    "ctype.h": "c",
+    "diy_printf.h": "c",
+    "cstdint": "c"
   }
 
 }

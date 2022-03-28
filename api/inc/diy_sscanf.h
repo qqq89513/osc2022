@@ -2,7 +2,6 @@
 #ifndef __DIY_SSCANF_H_
 #define __DIY_SSCANF_H_
 
-#include <stdarg.h>
 #include <stddef.h>
 
 
@@ -13,7 +12,7 @@ extern "C" {
 
 
 int sscanf_(const char *ibuf, const char *fmt, ...);
-int vsscanf_(const char *inp, char const *fmt0, va_list ap);
+int vsscanf_(const char *inp, char const *fmt0, __builtin_va_list ap);
 
 #ifdef __cplusplus
 }

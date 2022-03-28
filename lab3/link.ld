@@ -2,15 +2,15 @@
 SECTIONS
 {
   . = 0x80000;               /* set . counter to Initial address */
-  . = ALIGN(8);
+  . = ALIGN(16);
   .text : { *(.text*) }      /* text section */
   .data : {                  /* Data section */
-    . = ALIGN(8);            /* prevent overlapping */
+    . = ALIGN(16);            /* prevent overlapping */
     *(.data)
     *(.data*)
   }
   .bss  : {                  /* Place bss right behind data in the memmory */
-    . = ALIGN(8);            /* prevent overlapping */
+    . = ALIGN(16);            /* prevent overlapping */
     _bss_start = .;
     *(.bss)
     *(.bss*)
