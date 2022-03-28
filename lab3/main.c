@@ -18,6 +18,7 @@
 #define CMD_CAT      "cat"
 #define CMD_LSDEV    "lsdev"
 #define CMD_EL0      "el0"
+#define CMD_EXEC     "exec"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -25,6 +26,7 @@ static void show_hardware_info();
 static int spilt_strings(char** str_arr, char* str, char* deli);
 extern uint64_t _start;
 extern void from_el1_to_el0(); // defined in start.S
+extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp); // defined in start.S
 void main(void *dtb_addr)
 {
   char *input_s;
@@ -63,6 +65,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
         uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
         uart_printf(CMD_EL0    "\t\t: Switch from exception level el1 to el0 (user mode)\r\n");
+        uart_printf(CMD_EXEC " <file> \t: Switch to el0, reallocate the file (img) and jumps to it.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -88,6 +91,15 @@ void main(void *dtb_addr)
       else if(strcmp_(args[0], CMD_EL0) == 0){
         from_el1_to_el0();
         uart_printf("Now in el0 user mode.\r\n");
+      }
+      else if(strcmp_(args[0], CMD_EXEC) == 0){
+        if(args_cnt > 1){
+          // Reallocate file to 0x50000
+          if(cpio_copy(args[1], (uint8_t*) 0x50000) == 0)
+            from_el1_to_el0_remote((uint64_t)dtb_addr, 0x50000, 0x50000); // jumps to 0x50000
+        }
+        else
+          uart_printf("Usage: " CMD_EXEC " <file>\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);

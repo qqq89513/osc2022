@@ -77,6 +77,31 @@ void cpio_ls(){
   }
 }
 
+// This function copies content of file_name to destination
+int cpio_copy(char *file_name, uint8_t *destination){
+  cpio_file_ll *file = files_arr;
+  uint8_t *dest_ptr = destination;
+  uint8_t *src_ptr = NULL;
+  uint32_t size = 0;
+
+  // Traverse the linked list
+  while(file->next != NULL){
+    if(strcmp_(file_name, (char*)file->pathname) == 0){
+      src_ptr = file->data_ptr;
+      size = file->file_size;
+      // Copy executable to destination
+      for(uint32_t i = 0; i < size; i++)
+        *dest_ptr++ = *src_ptr++;
+
+      uart_printf("cpio_copy: copied %s to %p, size=%u.\r\n", file_name, destination, size);
+      return 0;
+    }
+    file = file->next;
+  }
+  uart_printf("cpio_copy: cannot access '%s': No such file or directory\r\n", file_name);
+  return -1;
+}
+
 int cpio_cat(char *file_name){
   cpio_file_ll *file = files_arr;
 

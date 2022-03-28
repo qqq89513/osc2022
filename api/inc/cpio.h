@@ -42,6 +42,7 @@ typedef struct __cpio_file{
 typedef int (cpio_parse_func) (void*); // function of ( int cpio_parse(void *addr); )
 int cpio_parse(void *addr);
 void cpio_ls();
+int cpio_copy(char *file_name, uint8_t *destination);
 int cpio_cat(char *file_name);
 
 #ifdef __cplusplus

@@ -27,6 +27,7 @@
 
 .global _start
 .global from_el1_to_el0
+.global from_el1_to_el0_remote
 
 _start:
     // read cpu id, stop slave cores
@@ -106,6 +107,22 @@ from_el1_to_el0:
     // set the user program’s stack pointer to a proper position by setting sp_el0.
     mov x1,        sp
     msr sp_el0,    x1           // set stack of el0 as orinary stack pointer
+    eret                        // jump to user code (jump to elr_el1)
+
+/*  Change from el1 to el0 with destination spcified
+    void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp);
+    @param args (x0): Value pass to remote user program
+    @param addr (x1): address to the remote user program
+    @param u_sp (x2): stack pointer value of remote user program
+ */ 
+from_el1_to_el0_remote:
+    // set spsr_el1 to 0x3c0
+    mov x3,        0x3c0        // EL0t, interrupt disabled
+    msr spsr_el1,  x3
+    // set elr_el1 to the user program’s address
+    msr elr_el1,   x1           // return address to the caller
+    // set the user program’s stack pointer to a proper position by setting sp_el0.
+    msr sp_el0,    x2           // set stack of el0 as orinary stack pointer
     eret                        // jump to user code (jump to elr_el1)
 
 /* 
