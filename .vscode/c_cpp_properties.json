@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "ARM-aarch64",
+            "includePath": [
+                "api/inc/"
+            ],
+            "defines": [
+            ],
+            "compilerPath": "C:/Coding/gcc-arm-10.3-2021.07-mingw-w64-i686-aarch64-none-elf/bin/aarch64-none-elf-gcc.exe",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "gcc-arm"
+        }
+    ],
+    "version": 4
+}

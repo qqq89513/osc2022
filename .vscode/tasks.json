@@ -1,0 +1,15 @@
+
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build debug",
+      "type": "process",
+      "isBackground": true,
+      "options": { "cwd": "${fileDirname}/" },
+      "problemMatcher": ["$gcc"],
+      "command": "make",
+      "args": ["build_gdb", "run_gdb"]
+    }
+  ]
+}

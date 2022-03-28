@@ -1,0 +1,19 @@
+{
+  "files.associations": {
+    "string.h": "c",
+    "gpio.h": "c",
+    "cstdio": "c",
+    "uart.h": "c",
+    "general.h": "c",
+    "newlib.h": "c",
+    "_newlib_version.h": "c",
+    "cctype": "c",
+    "diy_sscanf.h": "c",
+    "diy_string.C": "cpp",
+    "diy_malloc.h": "c",
+    "fdtb.h": "c",
+    "stdint.h": "c",
+    "stdint-gcc.h": "c"
+  }
+
+}

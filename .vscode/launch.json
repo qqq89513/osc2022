@@ -1,0 +1,31 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "name": "Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "preLaunchTask": "build debug",
+      "program": "${fileDirname}/debug/kernel8.elf",
+      "stopAtEntry": true,
+      "cwd": "${fileDirname}",
+      "environment": [],
+      "externalConsole": true,
+      "MIMode": "gdb",
+      "miDebuggerServerAddress": "localhost:1234",
+      "miDebuggerPath": "C:/Coding/gcc-arm-10.3-2021.07-mingw-w64-i686-aarch64-none-elf/bin/aarch64-none-elf-gdb.exe",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": false
+        },
+        // {"text": "target remote localhost:1234"}
+      ]
+    }
+  ]
+}
