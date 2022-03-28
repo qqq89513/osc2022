@@ -26,6 +26,7 @@
 .section ".text.boot"
 
 .global _start
+.global from_el1_to_el0
 
 _start:
     // read cpu id, stop slave cores
@@ -92,9 +93,20 @@ from_el2_to_el1:
     mov x1,        0x3c5        // EL1h (SPSel = 1) with interrupt disabled
     msr spsr_el2,  x1           
     msr elr_el2,   lr
-    ldr x1,        =_start      // load _start address to x1
+    mov x1,        sp
     msr sp_el1,    x1           // set stack of el1
     eret                        // return to EL1
+
+from_el1_to_el0:
+    // set spsr_el1 to 0x3c0
+    mov x1,        0x3c0        // EL0t, interrupt disabled
+    msr spsr_el1,  x1
+    // set elr_el1 to the user program’s address
+    msr elr_el1,   lr           // return address to the caller
+    // set the user program’s stack pointer to a proper position by setting sp_el0.
+    mov x1,        sp
+    msr sp_el0,    x1           // set stack of el0 as orinary stack pointer
+    eret                        // jump to user code (jump to elr_el1)
 
 /* 
   set vbar_el1 register to exception_vector_table address. 
