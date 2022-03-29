@@ -22,11 +22,18 @@
 
 #define ADDR_IMAGE_START 0x80000
 
-static void show_hardware_info();
-static int spilt_strings(char** str_arr, char* str, char* deli);
+// Externs
 extern uint64_t _start;
 extern void from_el1_to_el0(); // defined in start.S
 extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp); // defined in start.S
+
+// Globals defined here
+void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1);
+
+// Locals
+static void show_hardware_info();
+static int spilt_strings(char** str_arr, char* str, char* deli);
+
 void main(void *dtb_addr)
 {
   char *input_s;
@@ -105,6 +112,11 @@ void main(void *dtb_addr)
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
     }
   }
+}
+
+void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1){
+  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX\r\n",
+    spsr_el1, elr_el1, esr_el1);
 }
 
 static int spilt_strings(char** str_arr, char* str, char* deli){

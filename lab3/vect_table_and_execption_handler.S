@@ -85,7 +85,7 @@ exception_vector_table_el1:
 // After an exeception is raised, exeception level goes from el0 to el1
 // So the exeception raised in el0 is handled in el1
 set_exception_vector_table_el1:
-  adr x1, exception_vector_table_el1
+  adr x1,       exception_vector_table_el1
   msr vbar_el1, x1
   ret
 
@@ -107,10 +107,12 @@ irq_invalid_el0_32_ex_handler:
 fiq_invalid_el0_32_ex_handler:
 error_invalid_el0_32_ex_handler:
   save_all
-  // TODO: print spsr_el1, elr_el1, esr_el1 instead of infinity loop
-1: wfe
-    mov x1, 0xdead
-    b 1b // infinity loop  
+  // void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1)
+  // mrs a, b: Write system coprocessor register to arm register a
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  bl  dump_3_regs    // defined in main.c
   load_all
   eret
 
