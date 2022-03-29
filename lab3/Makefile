@@ -20,6 +20,7 @@ LDFLAGS_gdb = $(LDFLAGS) -ggdb
 # LDFLAGS = -T link.ld -nostartfiles -ffreestanding -nostartfiles -ffreestanding -mthumb -Wall -fdump-rtl-expand -specs=nano.specs --specs=rdimon.specs   -Wl,--start-group -lgcc -lc -lm -lrdimon -Wl,--end-group
 TOOL_CHAIN_PREFIX = aarch64-none-elf
 CC = $(TOOL_CHAIN_PREFIX)-gcc
+AS = $(TOOL_CHAIN_PREFIX)-as
 LD = $(TOOL_CHAIN_PREFIX)-gcc
 SIZE = $(TOOL_CHAIN_PREFIX)-size
 OBJCOPY = $(TOOL_CHAIN_PREFIX)-objcopy
@@ -63,6 +64,12 @@ run_gdb:
 
 build_gdb:
 	make BUILD_DIR="$(BUILD_DIR_gdb)" ASMFLAGS="$(ASMFLAGS_gdb)" CCFLAGS="$(CCFLAGS_gdb)" LDFLAGS="$(LDFLAGS_gdb)" all --no-print-directory
+
+build_el0: create_dir
+	$(AS) -c user.asm -o $(BUILD_DIR)/user.o
+	$(LD) $(LDFLAGS) $(BUILD_DIR)/user.o -o $(OUTPUT_DIR)/user.elf
+	$(OBJCOPY) -O binary $(OUTPUT_DIR)/user.elf $(OUTPUT_DIR)/user.img
+	$(SIZE) $(OUTPUT_DIR)/user.elf
 
 flash:
 	cp $(OUTPUT_DIR)/kernel8.img /D/kernel8.img

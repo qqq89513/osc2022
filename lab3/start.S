@@ -47,8 +47,8 @@ _start:
     mov     sp, x1
 
     // Set privilege from el2 to el1
-    bl from_el2_to_el1                  // set exeception level from el2 to el1. Next instruction executes in el1
-    // bl set_exception_vector_table    // set look up vector_table when exception raised
+    bl      from_el2_to_el1                 // set exeception level from el2 to el1. Next instruction executes in el1
+    bl      set_exception_vector_table_el1  // set look up vector table when exception raised, defined in vect_talbe_and_exeception_handler.S
 
     // clear bss
     ldr     x1, =_bss_start
@@ -124,13 +124,3 @@ from_el1_to_el0_remote:
     // set the user program’s stack pointer to a proper position by setting sp_el0.
     msr sp_el0,    x2           // set stack of el0 as orinary stack pointer
     eret                        // jump to user code (jump to elr_el1)
-
-/* 
-  set vbar_el1 register to exception_vector_table address. 
-  1. exception_vector_table address to x0 register
-  2. x0 register value to vbar_el1 status register 
-*/
-// set_exception_vector_table:
-//     adr x0, exception_vector_table
-//     msr vbar_el1, x0
-//     ret

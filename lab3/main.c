@@ -96,7 +96,7 @@ void main(void *dtb_addr)
         if(args_cnt > 1){
           // Reallocate file to 0x50000
           if(cpio_copy(args[1], (uint8_t*) 0x50000) == 0)
-            from_el1_to_el0_remote((uint64_t)dtb_addr, 0x50000, 0x50000); // jumps to 0x50000
+            from_el1_to_el0_remote((uint64_t)dtb_addr, 0x50000, 0x50000); // switch to el0 and jumps to 0x50000
         }
         else
           uart_printf("Usage: " CMD_EXEC " <file>\r\n");
