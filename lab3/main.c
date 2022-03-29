@@ -7,6 +7,7 @@
 #include "cpio.h"
 #include "diy_malloc.h"
 #include "fdtb.h"
+#include "sys_reg.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal-lab3$ "
@@ -21,7 +22,6 @@
 #define CMD_EXEC     "exec"
 #define CMD_TIMER     "timer"
 
-#define ADDR_IMAGE_START 0x80000
 
 // Externs
 extern uint64_t _start;
@@ -32,16 +32,20 @@ extern int core_timer_enable(); // defined in start.S
 // Globals defined here
 void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1);
 void c_irq_handler_timer(uint64_t ticks, uint64_t freq);
+void c_irq_el1h_ex_handler();
 
 // Locals
 static void show_hardware_info();
 static int spilt_strings(char** str_arr, char* str, char* deli);
+static int exeception_level = 0;
 
 void main(void *dtb_addr)
 {
   char *input_s;
   char **args;
   int args_cnt = 0;
+
+  exeception_level = 1;
 
   input_s = simple_malloc(sizeof(char) * 32);
   args = simple_malloc(sizeof(char*) * 10);
@@ -56,6 +60,7 @@ void main(void *dtb_addr)
   uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
 
   fdtb_parse(dtb_addr, 0, cpio_parse);
+  EL1_ARM_INTERRUPT_ENABLE();
 
   while(1) {
 
@@ -101,6 +106,7 @@ void main(void *dtb_addr)
       }
       else if(strcmp_(args[0], CMD_EL0) == 0){
         from_el1_to_el0();
+        exeception_level = 0;
         uart_printf("Now in el0 user mode.\r\n");
       }
       else if(strcmp_(args[0], CMD_EXEC) == 0){
@@ -114,8 +120,9 @@ void main(void *dtb_addr)
       }
       else if(strcmp_(args[0], CMD_TIMER) == 0){
         core_timer_enable();
-        from_el1_to_el0();
-        while(1);         // print ticks every 2 seconds
+        // from_el1_to_el0();
+        // exeception_level = 0;
+        // while(1);         // print ticks every 2 seconds
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
@@ -154,4 +161,28 @@ static void show_hardware_info(){
   uart_printf("board_rev=0x%08X\r\n", board_rev);
   uart_printf("mem_start_addr=0x%p\r\n", mem_start_addr);
   uart_printf("mem_size=0x%08X\r\n", mem_size);
+}
+
+// General interrupt fired in el1
+void c_irq_el1h_ex_handler(){
+  // Enter critical section
+  EL1_ARM_INTERRUPT_DISABLE();
+  
+  if(*IRQS1_PENDING & AUX_INT){
+    uart_printf("uart interrupt\r\n");
+  }
+  else{
+    // only available in el1
+    // Dump time ticks
+    unsigned long cntpct = read_sysreg(cntpct_el0);
+	  unsigned long cntfrq = read_sysreg(cntfrq_el0);
+    c_irq_handler_timer(cntpct, cntfrq);
+
+    // Update timer (next tick at 2 sec after)
+    write_sysreg(cntp_tval_el0, cntfrq << 1);
+  }
+
+  // Exit critical section
+  EL1_ARM_INTERRUPT_ENABLE();
+
 }

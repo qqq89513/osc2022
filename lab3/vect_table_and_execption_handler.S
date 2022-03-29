@@ -90,6 +90,12 @@ set_exception_vector_table_el1:
   msr vbar_el1, x1
   ret
 
+irq_el1h_ex_handler:
+  save_all
+  bl  c_irq_el1h_ex_handler
+  load_all
+  eret
+
 irq_el0_64_ex_handler:
   save_all
   // TODO: Scan pending bits to determine which interrupt is fired
@@ -108,7 +114,6 @@ irq_invalid_el1t_ex_handler:
 fiq_invalid_el1t_ex_handler:
 error_invalid_el1t_ex_handler:
 sync_el1h_ex_handler:
-irq_el1h_ex_handler:
 fiq_invalid_el1h_ex_handler:
 error_invalid_el1h_ex_handler:
 sync_el0_64_ex_handler:

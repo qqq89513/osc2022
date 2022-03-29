@@ -30,6 +30,9 @@
 
 #define WAIT_TICKS(cnt, tk) {cnt = tk; while(cnt--) { asm volatile("nop"); }}
 
+#define EL1_ARM_INTERRUPT_ENABLE()  { __asm__ __volatile__("msr daifclr, 0xf"); }
+#define EL1_ARM_INTERRUPT_DISABLE() { __asm__ __volatile__("msr daifset, 0xf"); }
+
 void reset(int tick);
 
 #endif /* __GENERAL_H */

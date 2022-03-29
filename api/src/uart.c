@@ -16,6 +16,12 @@
 #define AUX_MU_STAT   ((volatile unsigned int*)(MMIO_BASE+0x00215064))
 #define AUX_MU_BAUD   ((volatile unsigned int*)(MMIO_BASE+0x00215068))
 
+#define RX_TX_BUF_SIZE 1024
+char rx_buf[RX_TX_BUF_SIZE];
+char tx_buf[RX_TX_BUF_SIZE];
+int rx_buf_start, rx_buf_end;
+int tx_buf_start, tx_buf_end;
+
 /**
  * Set baud rate and characteristics (115200 8N1) and map to GPIO
  */
@@ -42,10 +48,11 @@ void uart_init()
   *AUX_MU_CNTL = 0;
   *AUX_MU_LCR  = 3;    // 8 bits
   *AUX_MU_MCR  = 0;
-  *AUX_MU_IER  = 0;
-  *AUX_MU_IIR  = 0xC6;   // disable interrupts
+  *AUX_MU_IER  = 0;    // Disable interrupt
+  *AUX_MU_IIR  = 0x06; // clear Tx and RX FIFO
   *AUX_MU_BAUD = 270;  // 115200 baud
-  *AUX_MU_CNTL = 3;       // enable Tx, Rx
+  *AUX_MU_CNTL = 3;    // enable Tx, Rx
+  _enable_uart_interrupt();
 }
 
 /* Wrapping snprintf and HAL_UART_Transmit, just use this as printf
@@ -152,4 +159,33 @@ int uart_gets_n(int n, char *str, int echo){
 
 void _putchar(char character){
   uart_send(character);
+}
+
+void uart_rx_tx_handler() {
+  _disable_uart_interrupt();
+  int RX = (*AUX_MU_IIR & 0x4);
+  int TX = (*AUX_MU_IIR & 0x2);
+  if(RX){
+    char c = (char)(*AUX_MU_IO);
+    rx_buf[rx_buf_end++] = c;
+    if(rx_buf_end == RX_TX_BUF_SIZE)
+      rx_buf_end = 0;
+  }
+  else if(TX){
+    while (*AUX_MU_LSR & 0x20){
+      if(tx_buf_start == tx_buf_end){
+        _clear_tx_interrupt();
+        break;
+      }
+      char c = tx_buf[tx_buf_start++];
+      *AUX_MU_IO = c;
+      if(tx_buf_start == RX_TX_BUF_SIZE)
+        tx_buf_start = 0;
+    }
+  }
+  else{
+    uart_puts("uart_rx_tx_handler: should not got here.\r\n");
+    while (1);
+  }
+  _enable_uart_interrupt();
 }
