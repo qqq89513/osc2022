@@ -80,6 +80,7 @@ exception_vector_table_el1:
   align7_b  irq_invalid_el0_32_ex_handler       // IRQ 32-bit EL0
   align7_b  fiq_invalid_el0_32_ex_handler       // FIQ 32-bit EL0
   align7_b  error_invalid_el0_32_ex_handler     // Error 32-bit EL0
+  .align 7
 
 // Set exception vector table for execeptions raised from el0
 // After an exeception is raised, exeception level goes from el0 to el1
@@ -88,6 +89,18 @@ set_exception_vector_table_el1:
   adr x1,       exception_vector_table_el1
   msr vbar_el1, x1
   ret
+
+irq_el0_64_ex_handler:
+  save_all
+  // TODO: Scan pending bits to determine which interrupt is fired
+  mrs x0,            cntpct_el0      // The timer’s current count
+  mrs x1,            cntfrq_el0      // Frequency the timer is running on
+  bl  c_irq_handler_timer            // call timer handler in c domain. defined in main.c: void c_irq_handler_timer(uint64_t ticks, uint64_t freq);
+  mrs x0,            cntfrq_el0      // Set count down timer to cpu_frequency << 1, i.e. 2 seconds
+  lsl x0,            x0, #1          // left shift 1
+  msr cntp_tval_el0, x0
+  load_all
+  eret
 
 unimplemented_ex_handler:
 sync_invalid_el1t_ex_handler:
@@ -99,7 +112,6 @@ irq_el1h_ex_handler:
 fiq_invalid_el1h_ex_handler:
 error_invalid_el1h_ex_handler:
 sync_el0_64_ex_handler:
-irq_el0_64_ex_handler:
 fiq_invalid_el0_64_ex_handler:
 error_invalid_el0_64_ex_handler:
 sync_invalid_el0_32_ex_handler:

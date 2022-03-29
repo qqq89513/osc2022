@@ -28,6 +28,7 @@
 .global _start
 .global from_el1_to_el0
 .global from_el1_to_el0_remote
+.global core_timer_enable
 
 _start:
     // read cpu id, stop slave cores
@@ -65,6 +66,18 @@ jump_to_main:
     // for failsafe, halt this core too
     b       1b
 
+
+
+core_timer_enable:
+    mov x0,            1
+    msr cntp_ctl_el0,  x0                     // set on or off
+    mrs x0,            cntfrq_el0
+    msr cntp_tval_el0, x0                     // set expired time to 1*cpu_freq, i.e. 1 second
+    mov x0,            2
+    ldr x1,            =0x40000040            // 0x40000040 is CORE0_TIMER_IRQ_CTRL, Address: 0x4000_0040 Core 0 Timers interrupt control, ref: https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
+    str w0,            [x1]                   // unmask timer interrupt, i.e. enable core timer interrupt
+    ret
+
 /* 
   Set exception level from EL2 to EL1
   In default, rpi3 cpu runs in el2.
@@ -99,8 +112,7 @@ from_el2_to_el1:
     eret                        // return to EL1
 
 from_el1_to_el0:
-    // set spsr_el1 to 0x3c0
-    mov x1,        0x3c0        // EL0t, interrupt disabled
+    mov x1,        0x000        // EL0t, all interrupts enabled, 0x3c0 for interrupts disabled
     msr spsr_el1,  x1
     // set elr_el1 to the user program’s address
     msr elr_el1,   lr           // return address to the caller

@@ -19,6 +19,7 @@
 #define CMD_LSDEV    "lsdev"
 #define CMD_EL0      "el0"
 #define CMD_EXEC     "exec"
+#define CMD_TIMER     "timer"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -26,9 +27,11 @@
 extern uint64_t _start;
 extern void from_el1_to_el0(); // defined in start.S
 extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp); // defined in start.S
+extern int core_timer_enable(); // defined in start.S
 
 // Globals defined here
 void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1);
+void c_irq_handler_timer(uint64_t ticks, uint64_t freq);
 
 // Locals
 static void show_hardware_info();
@@ -73,6 +76,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
         uart_printf(CMD_EL0    "\t\t: Switch from exception level el1 to el0 (user mode)\r\n");
         uart_printf(CMD_EXEC " <file> \t: Switch to el0, reallocate the file (img) and jumps to it.\r\n");
+        uart_printf(CMD_TIMER  "\t\t: Print ticks every 2 seconds.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -108,6 +112,11 @@ void main(void *dtb_addr)
         else
           uart_printf("Usage: " CMD_EXEC " <file>\r\n");
       }
+      else if(strcmp_(args[0], CMD_TIMER) == 0){
+        core_timer_enable();
+        from_el1_to_el0();
+        while(1);         // print ticks every 2 seconds
+      }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
     }
@@ -117,6 +126,11 @@ void main(void *dtb_addr)
 void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1){
   uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX\r\n",
     spsr_el1, elr_el1, esr_el1);
+}
+
+void c_irq_handler_timer(uint64_t ticks, uint64_t freq){
+  uart_printf("ticks=%ld, freq=%ld, time elapsed=%ldms\r\n", 
+    ticks, freq, (ticks*1000) / freq);
 }
 
 static int spilt_strings(char** str_arr, char* str, char* deli){
