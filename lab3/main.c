@@ -168,10 +168,13 @@ void c_irq_el1h_ex_handler(){
   // Enter critical section
   EL1_ARM_INTERRUPT_DISABLE();
   
+  // uart interrupt fired
   if(*IRQS1_PENDING & AUX_INT){
     uart_printf("uart interrupt\r\n");
   }
-  else{
+
+  // arm core 0 timer interrupt fired
+  else if(*CORE0_IRQ_SOURCE & COREx_IRQ_SOURCE_CNTPNSIRQ_MASK){
     // only available in el1
     // Dump time ticks
     unsigned long cntpct = read_sysreg(cntpct_el0);
@@ -182,7 +185,14 @@ void c_irq_el1h_ex_handler(){
     write_sysreg(cntp_tval_el0, cntfrq << 1);
   }
 
+  // Unknown interrupt fired
+  else{
+    uart_printf("Unknown general interrupt fired, IRQS1_PENDING=0x%08X, CORE0_IRQ_SOURCE=0x%08X, in c_irq_el1h_ex_handler().\r\n",
+      *IRQS1_PENDING, *CORE0_IRQ_SOURCE);
+    uart_printf("Blocking in while(1) now...\r\n");
+    while(1);
+  }
+
   // Exit critical section
   EL1_ARM_INTERRUPT_ENABLE();
-
 }
