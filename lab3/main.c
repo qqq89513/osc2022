@@ -21,6 +21,7 @@
 #define CMD_EL0      "el0"
 #define CMD_EXEC     "exec"
 #define CMD_TIMER     "timer"
+#define CMD_ASYNC_PRINT "async_print"
 
 
 // Externs
@@ -50,8 +51,12 @@ void main(void *dtb_addr)
   input_s = simple_malloc(sizeof(char) * 32);
   args = simple_malloc(sizeof(char*) * 10);
 
+  // Enable interrupt in el1
+  EL1_ARM_INTERRUPT_ENABLE();
+
   // set up serial console
   uart_init();
+  _enable_uart_interrupt(); // this only enables uart interrupt, you need to call _enable_tx_interrupt() or _enable_rx_interrupt
 
   // say hello
   uart_printf("\r\n\r\n");
@@ -60,7 +65,6 @@ void main(void *dtb_addr)
   uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
 
   fdtb_parse(dtb_addr, 0, cpio_parse);
-  EL1_ARM_INTERRUPT_ENABLE();
 
   while(1) {
 
@@ -82,6 +86,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_EL0    "\t\t: Switch from exception level el1 to el0 (user mode)\r\n");
         uart_printf(CMD_EXEC " <file> \t: Switch to el0, reallocate the file (img) and jumps to it.\r\n");
         uart_printf(CMD_TIMER  "\t\t: Print ticks every 2 seconds.\r\n");
+        uart_printf(CMD_ASYNC_PRINT "\t: Test printing asynchronously with tx interrupt.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -123,6 +128,11 @@ void main(void *dtb_addr)
         // from_el1_to_el0();
         // exeception_level = 0;
         // while(1);         // print ticks every 2 seconds
+      }
+      else if(strcmp_(args[0], CMD_ASYNC_PRINT) == 0){
+        uart_puts_async("async send 1\r\n");
+        uart_puts_async("async send 2\r\n");
+        uart_puts_async("async send 3\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
@@ -166,11 +176,11 @@ static void show_hardware_info(){
 // General interrupt fired in el1
 void c_irq_el1h_ex_handler(){
   // Enter critical section
-  EL1_ARM_INTERRUPT_DISABLE();
-  
+  // EL1_ARM_INTERRUPT_DISABLE();  // this doesn't work with uart_puts_async(), don't know why
+
   // uart interrupt fired
   if(*IRQS1_PENDING & AUX_INT){
-    uart_printf("uart interrupt\r\n");
+    uart_rx_tx_handler();
   }
 
   // arm core 0 timer interrupt fired
@@ -194,5 +204,5 @@ void c_irq_el1h_ex_handler(){
   }
 
   // Exit critical section
-  EL1_ARM_INTERRUPT_ENABLE();
+  // EL1_ARM_INTERRUPT_ENABLE();  // this doesn't work with uart_puts_async(), don't know why
 }

@@ -16,11 +16,15 @@
 #define AUX_MU_STAT   ((volatile unsigned int*)(MMIO_BASE+0x00215064))
 #define AUX_MU_BAUD   ((volatile unsigned int*)(MMIO_BASE+0x00215068))
 
+#define AUX_MU_IIR_TX_MASK    ((volatile unsigned int)(1 << 1)) // Transmit holding register empty   | ref: page 13
+#define AUX_MU_IIR_RX_MASK    ((volatile unsigned int)(1 << 0)) // Receiver holds valid byte         | https://cs140e.sergio.bz/docs/BCM2837-ARM-Peripherals.pdf 
+
+// Circular buffer for rx and tx
 #define RX_TX_BUF_SIZE 1024
 char rx_buf[RX_TX_BUF_SIZE];
 char tx_buf[RX_TX_BUF_SIZE];
-int rx_buf_start, rx_buf_end;
-int tx_buf_start, tx_buf_end;
+int rx_buf_out, rx_buf_in;
+int tx_buf_out, tx_buf_in;
 
 /**
  * Set baud rate and characteristics (115200 8N1) and map to GPIO
@@ -52,7 +56,6 @@ void uart_init()
   *AUX_MU_IIR  = 0x06; // clear Tx and RX FIFO
   *AUX_MU_BAUD = 270;  // 115200 baud
   *AUX_MU_CNTL = 3;    // enable Tx, Rx
-  _enable_uart_interrupt();
 }
 
 /* Wrapping snprintf and HAL_UART_Transmit, just use this as printf
@@ -162,30 +165,50 @@ void _putchar(char character){
 }
 
 void uart_rx_tx_handler() {
-  _disable_uart_interrupt();
-  int RX = (*AUX_MU_IIR & 0x4);
-  int TX = (*AUX_MU_IIR & 0x2);
-  if(RX){
-    char c = (char)(*AUX_MU_IO);
-    rx_buf[rx_buf_end++] = c;
-    if(rx_buf_end == RX_TX_BUF_SIZE)
-      rx_buf_end = 0;
+  int RX = (*AUX_MU_IIR & AUX_MU_IIR_RX_MASK);
+  int TX = (*AUX_MU_IIR & AUX_MU_IIR_TX_MASK);
+
+  // RX interrupt
+  if(RX){ 
+    // FIFO insert
+    rx_buf[rx_buf_in++] = (char)(*AUX_MU_IO); // read 1 byte from peripheral
+    if(rx_buf_in >= RX_TX_BUF_SIZE)
+      rx_buf_in = 0;
   }
+  // TX interrupt
   else if(TX){
-    while (*AUX_MU_LSR & 0x20){
-      if(tx_buf_start == tx_buf_end){
-        _clear_tx_interrupt();
-        break;
-      }
-      char c = tx_buf[tx_buf_start++];
-      *AUX_MU_IO = c;
-      if(tx_buf_start == RX_TX_BUF_SIZE)
-        tx_buf_start = 0;
+    if(tx_buf_out == tx_buf_in){
+      // Do not raise an interrupt when tx is ready
+      _disable_tx_interrupt();
+      return;
     }
+    // Write to hardware peripheral buffer
+    *AUX_MU_IO = tx_buf[tx_buf_out++];
+    if(tx_buf_out >= RX_TX_BUF_SIZE)
+      tx_buf_out = 0;
+
+    // Tell cpu to raise an interrupt once it's ready to send a byte, i.e., no pending byte to be send
+    _enable_tx_interrupt();
   }
   else{
     uart_puts("uart_rx_tx_handler: should not got here.\r\n");
     while (1);
   }
-  _enable_uart_interrupt();
+}
+
+void uart_puts_async(char *str) {
+
+  // Blocking wait if FIFO is full
+  while( (tx_buf_in+1) % RX_TX_BUF_SIZE == tx_buf_out)
+    _enable_tx_interrupt();
+
+  _disable_tx_interrupt(); // prevent modification on tx_buf[], critical section
+  // Insert the string into tx FIFO buffer
+  for(int i = 0; str[i]; i++) {
+    tx_buf[tx_buf_in++] = str[i];
+    if(tx_buf_in == RX_TX_BUF_SIZE)
+      tx_buf_in = 0;
+  }
+  // Tell cpu to raise an interrupt once it's ready to send a byte
+  _enable_tx_interrupt();
 }
