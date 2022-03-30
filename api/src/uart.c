@@ -17,14 +17,14 @@
 #define AUX_MU_BAUD   ((volatile unsigned int*)(MMIO_BASE+0x00215068))
 
 #define AUX_MU_IIR_TX_MASK    ((volatile unsigned int)(1 << 1)) // Transmit holding register empty   | ref: page 13
-#define AUX_MU_IIR_RX_MASK    ((volatile unsigned int)(1 << 0)) // Receiver holds valid byte         | https://cs140e.sergio.bz/docs/BCM2837-ARM-Peripherals.pdf 
+#define AUX_MU_IIR_RX_MASK    ((volatile unsigned int)(1 << 2)) // Receiver holds valid byte         | https://cs140e.sergio.bz/docs/BCM2837-ARM-Peripherals.pdf 
 
 // Circular buffer for rx and tx
 #define RX_TX_BUF_SIZE 1024
 char rx_buf[RX_TX_BUF_SIZE];
 char tx_buf[RX_TX_BUF_SIZE];
-int rx_buf_out, rx_buf_in;
-int tx_buf_out, tx_buf_in;
+int rx_buf_out=0, rx_buf_in=0;
+int tx_buf_out=0, tx_buf_in=0;
 
 /**
  * Set baud rate and characteristics (115200 8N1) and map to GPIO
@@ -169,7 +169,9 @@ void uart_rx_tx_handler() {
   int TX = (*AUX_MU_IIR & AUX_MU_IIR_TX_MASK);
 
   // RX interrupt
-  if(RX){ 
+  if(RX){
+    // Should also check if the FIFO is full by checking (rx_buf_in+1) % RX_TX_BUF_SIZE == rx_buf_out
+    // But I'm lazy
     // FIFO insert
     rx_buf[rx_buf_in++] = (char)(*AUX_MU_IO); // read 1 byte from peripheral
     if(rx_buf_in >= RX_TX_BUF_SIZE)
@@ -177,23 +179,84 @@ void uart_rx_tx_handler() {
   }
   // TX interrupt
   else if(TX){
+    // Transmit completes, FIFO empty
     if(tx_buf_out == tx_buf_in){
       // Do not raise an interrupt when tx is ready
       _disable_tx_interrupt();
       return;
     }
-    // Write to hardware peripheral buffer
-    *AUX_MU_IO = tx_buf[tx_buf_out++];
-    if(tx_buf_out >= RX_TX_BUF_SIZE)
-      tx_buf_out = 0;
+    else{
+      // Write to hardware peripheral buffer
+      *AUX_MU_IO = tx_buf[tx_buf_out++];
+      if(tx_buf_out >= RX_TX_BUF_SIZE)
+        tx_buf_out = 0;
 
-    // Tell cpu to raise an interrupt once it's ready to send a byte, i.e., no pending byte to be send
-    _enable_tx_interrupt();
+      // Tell cpu to raise an interrupt once it's ready to send a byte, i.e., no pending byte to be send
+      _enable_tx_interrupt();
+    }
   }
   else{
     uart_puts("uart_rx_tx_handler: should not got here.\r\n");
     while (1);
   }
+}
+
+/** Get string asynchronously, return -1 if no newline received yet.
+ * You should polling this function in while(1)
+ * @param n: maximum length of str[]
+ * @param str: output of string
+ * @param echo: print character received or not
+ * @return Length of str, -1 if no newline received yet.
+*/
+int uart_gets_n_async(int n, char *str, int echo){
+  static int index = 0;
+  int temp;
+  // Check for maximum length
+  if(index >= n){
+    str[n-1] = '\0';
+    index = 0;
+    return n-1;
+  }
+
+  // Read a char and try to parse
+  temp = uart_getc_async();
+
+  if(temp < 0)
+    return -1;
+  else if(temp == '\b' && index > 0){           // backspace implementation
+    uart_printf("\b \b");
+    index--;
+    str[index] = '\0';
+  }
+  else if(temp != '\b' && temp != '\n' && temp != '\r'){
+    if(echo) uart_send(temp); // echos
+    str[index] = temp;
+    index++;
+  }
+  else if(temp == '\n' || temp == '\r'){
+    str[index] = '\0';
+    uart_printf("\r\n");
+    int index_copy = index;
+    index = 0;
+    return index_copy+1;
+  }
+
+  return -1;
+}
+
+// Get a char from FIFO, return -1 if FIFO is empty
+int uart_getc_async(){
+  _enable_rx_interrupt();
+  // Return if FIFO is empty
+  if(rx_buf_in == rx_buf_out)
+    return -1;
+
+  _disable_rx_interrupt(); // prevent modification on rx_buf[], critical section
+  char c = rx_buf[rx_buf_out++]; // read from FIFO
+  if(rx_buf_out >= RX_TX_BUF_SIZE)
+    rx_buf_out = 0;
+  _enable_rx_interrupt();
+  return c;
 }
 
 void uart_puts_async(char *str) {
