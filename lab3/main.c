@@ -8,6 +8,7 @@
 #include "diy_malloc.h"
 #include "fdtb.h"
 #include "sys_reg.h"
+#include "timer.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi3-baremetal-lab3$ "
@@ -20,7 +21,8 @@
 #define CMD_LSDEV    "lsdev"
 #define CMD_EL0      "el0"
 #define CMD_EXEC     "exec"
-#define CMD_TIMER     "timer"
+#define CMD_PTIMER   "ptimer"
+#define CMD_setTimeout  "setTimeout"
 #define CMD_ASYNC_PRINT "async_print"
 
 
@@ -28,7 +30,6 @@
 extern uint64_t _start;
 extern void from_el1_to_el0(); // defined in start.S
 extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp); // defined in start.S
-extern int core_timer_enable(); // defined in start.S
 
 // Globals defined here
 void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1);
@@ -39,6 +40,7 @@ void c_irq_el1h_ex_handler();
 static void show_hardware_info();
 static int spilt_strings(char** str_arr, char* str, char* deli);
 static int exeception_level = 0;
+static int periodic_print(uint64_t sec);
 
 void main(void *dtb_addr)
 {
@@ -90,7 +92,8 @@ void main(void *dtb_addr)
           uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
           uart_printf(CMD_EL0    "\t\t: Switch from exception level el1 to el0 (user mode)\r\n");
           uart_printf(CMD_EXEC " <file> \t: Switch to el0, reallocate the file (img) and jumps to it.\r\n");
-          uart_printf(CMD_TIMER  "\t\t: Print ticks every 2 seconds.\r\n");
+          uart_printf(CMD_PTIMER  " <SECONDS>: Print ticks every SECONDS.\r\n");
+          uart_printf(CMD_setTimeout " <MESSAGE> <SECONDS>: Print MESSAGE after SECOND.\r\n");
           uart_printf(CMD_ASYNC_PRINT "\t: Test printing asynchronously with tx interrupt.\r\n");
         }
         else if(strcmp_(args[0], CMD_HELLO) == 0){
@@ -128,11 +131,30 @@ void main(void *dtb_addr)
           else
             uart_printf("Usage: " CMD_EXEC " <file>\r\n");
         }
-        else if(strcmp_(args[0], CMD_TIMER) == 0){
-          core_timer_enable();
-          // from_el1_to_el0();
-          // exeception_level = 0;
-          // while(1);         // print ticks every 2 seconds
+        else if(strcmp_(args[0], CMD_PTIMER) == 0){
+          if(args_cnt == 2){
+            uint64_t period = 0;
+            sscanf_(args[1], "%d", &period);
+            timer_add(periodic_print, period, "Periodic print", period);
+            // from_el1_to_el0();
+            // exeception_level = 0;
+            // while(1);         // print ticks every 2 seconds
+          }
+          else
+            uart_printf("Usage: " CMD_PTIMER " SECONDS\r\n");
+        }
+        else if(strcmp_(args[0], CMD_setTimeout) == 0){
+          if(args_cnt == 3){
+            char *msg = args[1];
+            uint64_t time_after = 0;
+            sscanf_(args[2], "%d", &time_after);
+            timer_add(NULL, 0, msg, time_after);
+          }
+          else{
+            uart_printf("Waiting queue:\r\n");
+            timer_queue_traversal();
+            uart_printf("Usage: " CMD_setTimeout " MESSAGE SECONDS\r\n");
+          }
         }
         else if(strcmp_(args[0], CMD_ASYNC_PRINT) == 0){
           uart_puts_async("async send 1\r\n");
@@ -182,6 +204,13 @@ static void show_hardware_info(){
   uart_printf("mem_size=0x%08X\r\n", mem_size);
 }
 
+// Timer callback example
+static int periodic_print(uint64_t sec){
+  timer_add(periodic_print, sec, "Periodic print", sec);
+  uart_printf("This is periodic_print callback.\r\n");
+  return 0;
+}
+
 // General interrupt fired in el1
 void c_irq_el1h_ex_handler(){
   // Enter critical section
@@ -199,9 +228,7 @@ void c_irq_el1h_ex_handler(){
     unsigned long cntpct = read_sysreg(cntpct_el0);
 	  unsigned long cntfrq = read_sysreg(cntfrq_el0);
     c_irq_handler_timer(cntpct, cntfrq);
-
-    // Update timer (next tick at 2 sec after)
-    write_sysreg(cntp_tval_el0, cntfrq << 1);
+    timer_dequeue();  // execute task in the head of the queue
   }
 
   // Unknown interrupt fired

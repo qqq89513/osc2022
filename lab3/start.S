@@ -28,7 +28,7 @@
 .global _start
 .global from_el1_to_el0
 .global from_el1_to_el0_remote
-.global core_timer_enable
+.global core_timer_state
 
 _start:
     // read cpu id, stop slave cores
@@ -67,12 +67,12 @@ jump_to_main:
     b       1b
 
 
-
-core_timer_enable:
-    mov x0,            1
+/*  Turn on and off core timer interrupt
+    void core_timer_state(uint64_t state);
+    @param state (x0): 0 for disable, 1 for enable
+ */
+core_timer_state:
     msr cntp_ctl_el0,  x0                     // set on or off
-    mrs x0,            cntfrq_el0
-    msr cntp_tval_el0, x0                     // set expired time to 1*cpu_freq, i.e. 1 second
     mov x0,            2
     ldr x1,            =0x40000040            // 0x40000040 is CORE0_TIMER_IRQ_CTRL, Address: 0x4000_0040 Core 0 Timers interrupt control, ref: https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
     str w0,            [x1]                   // unmask timer interrupt, i.e. enable core timer interrupt

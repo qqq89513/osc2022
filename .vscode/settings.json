@@ -16,7 +16,9 @@
     "stdint-gcc.h": "c",
     "ctype.h": "c",
     "diy_printf.h": "c",
-    "cstdint": "c"
+    "cstdint": "c",
+    "sys_reg.h": "c",
+    "timer.h": "c"
   }
 
 }
