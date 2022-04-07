@@ -26,7 +26,6 @@
 .section ".text.boot"
 
 .global _start
-.global core_timer_state
 
 _start:
     // read cpu id, stop slave cores
@@ -58,8 +57,3 @@ _start:
     bl      main
     // for failsafe, halt this core too
     b       1b
-
-
-// Implementation in lab3, do nothing here
-core_timer_state:
-    ret

@@ -8,7 +8,6 @@ extern "C" {
 
 #include <stdint.h>
 
-extern void core_timer_state(uint64_t state); // defined in start.S
 
 // User can declare function as int callback1 (uint64_t);
 typedef int (timer_callback) (uint64_t); // function of ( int timer_callback(uint64_t data); )
@@ -23,9 +22,9 @@ typedef struct __t_queue{
 } t_queue_ll; // ll for linked list
 
 void timer_add(timer_callback *callback, uint64_t callback_arg, char *msg, uint64_t after);
+void core_timer_state(uint64_t state);
 void timer_dequeue();
 void timer_queue_traversal();
-
 
 #ifdef __cplusplus
 }

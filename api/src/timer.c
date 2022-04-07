@@ -61,6 +61,16 @@ void timer_add(timer_callback *callback, uint64_t callback_arg, char *msg, uint6
   core_timer_state(1);
 }
 
+/** Turn on or off core timer interrupt
+  @param state (x0): 0 for disable, 1 for enable
+*/
+void core_timer_state(uint64_t state){
+  write_sysreg(cntp_ctl_el0, state);
+  asm volatile("mov x0,     2");
+  asm volatile("ldr x1,     =0x40000040");  // 0x40000040 is CORE0_TIMER_IRQ_CTRL, Address: 0x4000_0040 Core 0 Timers interrupt control, ref: https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
+  asm volatile("str w0,            [x1]");  // unmask timer interrupt, i.e. enable core timer interrupt
+}
+
 void timer_dequeue(){
 
   if(queue_head != NULL){
