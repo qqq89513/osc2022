@@ -22,8 +22,8 @@ typedef struct __free_frame_node{
 } freeframe_node;
 
 
-void malloc_init(uint64_t heap_start, uint64_t heap_end);
-
+void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
+int alloc_page(int page_cnt);
 
 #ifdef __cplusplus
 }

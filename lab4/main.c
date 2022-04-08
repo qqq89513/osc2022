@@ -17,6 +17,7 @@
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
 #define CMD_LSDEV    "lsdev"
+#define CMD_ALLOCATE_PAGE "alloc_page"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -38,11 +39,10 @@ void main(void *dtb_addr)
 
   // say hello
   uart_printf("\r\n\r\n");
-  uart_printf("Welcome------------------------ lab 2\r\n");
+  uart_printf("Welcome------------------------ lab 4\r\n");
 
   uart_printf("_start=0x%p, dtb_addr=0x%p, __heap_start=%p, __heap_end=%p\r\n", &_start, dtb_addr, &__heap_start, &__heap_end);
-  malloc_init((uint64_t)&__heap_start, (uint64_t)&__heap_end);
-
+  alloc_page_init((uint64_t)&__heap_start, (uint64_t)&__heap_end);
 
   fdtb_parse(dtb_addr, 0, cpio_parse);
 
@@ -63,6 +63,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
         uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
+        uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -84,6 +85,17 @@ void main(void *dtb_addr)
       }
       else if(strcmp_(args[0], CMD_LSDEV) == 0){
         fdtb_parse(dtb_addr, 1, NULL);
+      }
+      else if(strcmp_(args[0], CMD_ALLOCATE_PAGE) == 0){
+        if(args_cnt > 1){
+          int page_cnt = 0;
+          sscanf_(args[1], "%d", &page_cnt);
+          const int page_index = alloc_page(page_cnt);
+          if(page_index > -1)   uart_printf("Allocated %d at page #%d\r\n", page_cnt, page_index);
+          else                  uart_printf("Error, not enough of contiguious space for page count=%d\r\n", page_cnt);
+        }
+        else
+          uart_printf("Usage: " CMD_ALLOCATE_PAGE "<page count>\t: Allocate <page count> from heap.\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
