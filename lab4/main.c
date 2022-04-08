@@ -23,6 +23,7 @@
 static void show_hardware_info();
 static int spilt_strings(char** str_arr, char* str, char* deli);
 extern uint64_t _start;
+extern uint64_t __heap_start, __heap_end;
 void main(void *dtb_addr)
 {
   char *input_s;
@@ -39,7 +40,9 @@ void main(void *dtb_addr)
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 2\r\n");
 
-  uart_printf("_start=0x%p, dtb_addr=0x%p\r\n", &_start, dtb_addr);
+  uart_printf("_start=0x%p, dtb_addr=0x%p, __heap_start=%p, __heap_end=%p\r\n", &_start, dtb_addr, &__heap_start, &__heap_end);
+  malloc_init((uint64_t)&__heap_start, (uint64_t)&__heap_end);
+
 
   fdtb_parse(dtb_addr, 0, cpio_parse);
 

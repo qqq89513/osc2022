@@ -17,6 +17,12 @@ SECTIONS
     *(COMMON)
     _bss_end = .;
   }
+  . = ALIGN(8);
+  __heap_start = .;
+  . = . + 0x64000;            /* 400kB heap size */
+  __heap_end = .;
+  . = ALIGN(8);
   end = .;
+
 }
 _bss_size = (_bss_end - _bss_start)>>3;  /* >>3 is devided by 8, (_bss_end - _bss_start) is size in bytes, _bss_size is size in double_word (64 bits) */
