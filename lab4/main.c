@@ -17,7 +17,8 @@
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
 #define CMD_LSDEV    "lsdev"
-#define CMD_ALLOCATE_PAGE "alloc_page"
+#define CMD_ALLOCATE_PAGE "a"
+#define CMD_FREE_PAGE     "f"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -64,6 +65,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
         uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
         uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
+        uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -96,6 +98,15 @@ void main(void *dtb_addr)
         }
         else
           uart_printf("Usage: " CMD_ALLOCATE_PAGE "<page count>\t: Allocate <page count> from heap.\r\n");
+      }
+      else if(strcmp_(args[0], CMD_FREE_PAGE) == 0){
+        if(args_cnt > 1){
+          int page_index = 0;
+          sscanf_(args[1], "%d", &page_index);
+          free_page(page_index);
+        }
+        else
+          uart_printf("Usage: " CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);

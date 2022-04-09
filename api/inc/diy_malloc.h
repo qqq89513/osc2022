@@ -24,6 +24,7 @@ typedef struct __free_frame_node{
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
 int alloc_page(int page_cnt);
+int free_page(int page_index);
 
 #ifdef __cplusplus
 }

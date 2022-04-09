@@ -68,12 +68,12 @@ static int log2_floor(uint64_t x){
 }
 
 // Dump funcs
-void dump_the_frame_array(){
+static void dump_the_frame_array(){
   uart_printf("the_frame_array[] = ");
   for(int i=0; i<total_pages; i++)  uart_printf("%2d ", the_frame_array[i]);
   uart_printf("\r\n");
 }
-void dupmp_frame_freelist_arr(){
+static void dupmp_frame_freelist_arr(){
   uart_printf("frame_freelist_arr[] = \r\n");
   for(int i=MAX_CONTI_ALLOCATION_EXPO; i>=0; i--){
     freeframe_node *node = frame_freelist_arr[i];
@@ -159,6 +159,135 @@ int alloc_page(int page_cnt){
   dump_the_frame_array();
   dupmp_frame_freelist_arr();
   return page_allocated;
+}
+
+/** Merge frame_freelist_arr[fflists_idx] and it's buddy into frame_freelist_arr[fflists_idx+1]. 
+ * So before calling this function, a free node should be inserted to the head (frame_freelist_arr[fflists_idx]). Then 
+ * call this function. This function search head's buddy. If buddy found, merge them into a larger block, i.e., insert 
+ * it(2 nodes become 1) into the head of the linked list of larger block size. Finally return fflists_idx+1.
+ * @param fflists_idx: The index of frame_freelist_arr, indicating which block size to merge
+ * @return fflists_idx+1 if buddy found. 1 << (fflists_idx+1) is the block size that merged into. 
+ *  Return -1 if no buddy to merge.
+ *  Return -2 if exception.
+*/
+static int free_page_merge(int fflists_idx){
+  // Return if no head in the linked list
+  if(frame_freelist_arr[fflists_idx] == NULL){
+    uart_printf("Exception, frame_freelist_arr[%d] is NULL. @line=%d, file:%s\r\n", fflists_idx, __LINE__, __FILE__);
+    return -2;
+  }
+  
+  int freeing_page = frame_freelist_arr[fflists_idx]->index;
+  int block_size = the_frame_array[freeing_page];   // How many contiguous pages to free
+  int buddy_LR = (freeing_page / block_size % 2);   // 0 for left(lower) buddy, 1 for right(higher) buddy
+  // Compute the index of the neighbor to merge
+  int buddy_page = freeing_page + (buddy_LR ? -block_size : +block_size);
+  if(buddy_LR != 0 && buddy_LR != 1){  // Exception
+    uart_printf("Exception, shouldn't get here. buddy_LR=%d, @line=%d, file:%s\r\n", buddy_LR, __LINE__, __FILE__);
+    return -2;
+  }
+  
+  // Merge head and it's buddy in the linked list
+  freeframe_node **head = &frame_freelist_arr[fflists_idx];
+  freeframe_node *node = *head;
+  freeframe_node *node_prev = NULL;
+  fflists_idx++;
+  if(fflists_idx < ITEM_COUNT(frame_freelist_arr)){  // Check if larger block is acceptable
+    // Search for head's buddy to merge
+    while(node != NULL){
+      // Merge-able neighbor found, move the node to the linked list of a greater block size
+      if(node->index == buddy_page){
+        // Remove the node from the linked list
+        if(node_prev != NULL){  // Point previous node's next to current node's next, and remove and free head
+          node_prev->next = node->next;
+          // Remove and free head
+          freeframe_node *node_temp = *head;
+          *head = (*head)->next;
+          free_freeframe_node(node_temp);
+        }
+        else{                   // No previous node, that is, head is the buddy
+          uart_printf("Exception, should not get here, in free_page_merge(), @line=%d, file:%s\r\n", __LINE__, __FILE__);
+        }
+        
+        // Insert node to the linked list of a greater block size
+        node->index = (freeing_page < buddy_page) ? freeing_page : buddy_page; // = min(freeing_page, buddy_page), buddy's head is the smaller one
+        node->next = frame_freelist_arr[fflists_idx];
+        frame_freelist_arr[fflists_idx] = node;
+
+        // Update the frame array
+        block_size = block_size << 1;
+        const int start_idx = node->index + 1;
+        const int end_idx = node->index + block_size;
+        the_frame_array[node->index] = block_size;
+        for(int i=start_idx; i < end_idx; i++) the_frame_array[i] = FRAME_ARRAY_F;
+        
+        uart_printf("Merging %d and %d into %d. merged block_size=%d, start_idx=%d, end_idx=%d\r\n", 
+          buddy_page, freeing_page, node->index, block_size, start_idx, end_idx);
+
+        return fflists_idx;
+      }
+      // Advance node
+      node_prev = node;
+      node = node->next;
+    }
+  }
+
+  // We are here because either:
+  //  1. Cannot merge into a bigger block because it's already biggest. OR
+  //  2. No buddy block found in the linked list
+  return -1;
+}
+
+/** Free a page allocated from alloc_page()
+ * @return 0 on success. -1 on error.
+*/
+int free_page(int page_index){
+  int block_size = the_frame_array[page_index]; // How many contiguous pages to free
+  int fflists_idx = log2_floor(block_size);
+
+  // Check if ok to free, return -1 if not ok to free
+  if(block_size < 0){
+    uart_printf("Error, freeing wrong page. the_frame_array[%d]=%d, the page belongs to a block\r\n", page_index, block_size);
+    return -1;
+  }
+  else if(block_size == 1){
+    freeframe_node *head = frame_freelist_arr[fflists_idx];
+    // Search for page_index in the linked list
+    while(head != NULL){
+      if(head->index == page_index){
+        uart_printf("Error, freeing wrong page. Page %d is already in free lists. block_size=%d\r\n", page_index, block_size);
+        return -1;
+      }
+      head = head->next;
+    }
+  }
+  else{ // block_size > 1
+    if(the_frame_array[page_index + 1] != FRAME_ARRAY_X){
+      uart_printf("Error, freeing wrong page. Page %d is already in free lists. block_size=%d\r\n", page_index, block_size);
+      return -1;
+    }
+  }
+
+  // Insert a free node in to frame_freelist_arr[fflists_idx]
+  freeframe_node *node = malloc_freeframe_node();
+  node->index = page_index;
+  node->next = frame_freelist_arr[fflists_idx];
+  frame_freelist_arr[fflists_idx] = node;
+  // Update the frame array
+  const int start_idx = page_index + 1;
+  const int end_idx = page_index + block_size;
+  for(int i=start_idx; i < end_idx; i++) the_frame_array[i] = FRAME_ARRAY_F;
+  
+  // Merge iterativly
+  int fflists_merge = fflists_idx;
+  while(fflists_merge >= 0){
+    dupmp_frame_freelist_arr();
+    fflists_merge = free_page_merge(fflists_merge);
+  }
+
+  dump_the_frame_array();
+  dupmp_frame_freelist_arr();
+  return 0;
 }
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
