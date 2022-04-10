@@ -29,7 +29,7 @@ typedef struct __fdt_node_prop__{
 } fdt_node_prop;
 
 
-void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback);
+int fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback);
 
 #ifdef __cplusplus
 }

@@ -22,12 +22,15 @@ void* simple_malloc(size_t size){
 #define ITEM_COUNT(arr) (sizeof(arr) / sizeof(*arr))
 #define PAGE_SIZE 4096 // 4kB
 
-#define MAX_CONTI_ALLOCATION_EXPO 6 // i.g. =6 means max allocation size is 4kB * 2^6
+#define MAX_CONTI_ALLOCATION_EXPO 16 // i.g. =6 means max allocation size is 4kB * 2^6
 #define FRAME_ARRAY_F -1            // The idx’th frame is free, but it belongs to a larger contiguous memory block. Hence, buddy system doesn’t directly allocate it.
 #define FRAME_ARRAY_X -2            // The idx’th frame is already allocated, hence not allocatable.
 #define FRAME_ARRAY_P -3            // The idx’th frame is preserved, not allocatable
 static int *the_frame_array;        // Has the size of (heap_size/PAGE_SIZE), i.e., total_pages
 static size_t total_pages = 0;      // = heal_size / PAGE_SIZE
+
+// Preserved memory block linked list
+memblock_node *preserved_memblocks_head = NULL;
 
 // frame_freelist_arr[i] points to the head of the linked list of free 4kB*(2^i) pages
 freeframe_node *frame_freelist_arr[MAX_CONTI_ALLOCATION_EXPO + 1] = {NULL};
@@ -286,7 +289,7 @@ int free_page(int page_index, int verbose){
     fflists_merge = free_page_merge(fflists_merge);
   }
   if(verbose){
-    dump_the_frame_array();
+    if(total_pages < 200) dump_the_frame_array();
     dupmp_frame_freelist_arr();
   }
   return 0;
@@ -336,5 +339,38 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
       i--;
     }
   }
+
+  // Preserve pages
+  //  1. allocate all pages, 1 page at a time
+  //  2. mark preserved pages in the the_frame_array[]
+  //  3. free the pages that's not mark as preserved
+  memblock_node *node = preserved_memblocks_head;
+  if(node != NULL){
+    // Allocate all pages
+    for(int i=0; i<total_pages; i++)  alloc_page(1, 0);
+    // Mark preserved pages
+    while(node != NULL){
+      const int start_page = (node->start_addr - heap_start) / PAGE_SIZE;
+      const int end_page = (node->end_addr - heap_start) / PAGE_SIZE;
+      uart_printf("prevserved from page %d to %d\r\n", start_page, end_page);
+      if(start_page >= 0 && end_page <= total_pages)
+        for(int i=start_page; i<=end_page; i++)
+          the_frame_array[i] = FRAME_ARRAY_P;
+      node = node->next;
+    }
+    // Free not preserved pages
+    for(int i=0; i<total_pages; i++){
+    if(the_frame_array[i] != FRAME_ARRAY_P)
+      free_page(i, 0);
+  }
+  }
 }
 
+void mem_reserve(uint64_t start, uint64_t end){
+  // Insert a node to the head of preserved memblocks linked list
+  memblock_node *node = (memblock_node*) simple_malloc(sizeof(memblock_node));
+  node->start_addr = start;
+  node->end_addr = end;
+  node->next = preserved_memblocks_head;
+  preserved_memblocks_head = node;
+}

@@ -21,10 +21,16 @@ typedef struct __free_frame_node{
   struct __free_frame_node *next;
 } freeframe_node;
 
+typedef struct __memblock_node{
+  uint64_t start_addr;
+  uint64_t end_addr;
+  struct __memblock_node *next;
+} memblock_node;
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
 int alloc_page(int page_cnt, int verbose);
 int free_page(int page_index, int verbose);
+void mem_reserve(uint64_t start, uint64_t end);
 
 // Dump functions
 void dump_the_frame_array();

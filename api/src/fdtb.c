@@ -20,8 +20,8 @@ static void dump(void *arr, const uint32_t len);
 static uint32_t rev32(uint32_t val);
 static uint64_t endian_rev(void *input, int dtype_size);
 
-
-void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
+// Return devive tree size if parsed success, -1 if failed
+int fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
   fdt_header *header =  (fdt_header*) dtb_addr;
   uint8_t *structure_block_end = (uint8_t*)header + rev32(header->off_dt_struct) + rev32(header->size_dt_struct);
   if(print) uart_printf("[Debug] magic=0x%08X, totalsize=0x%08X, off_dt_struct=0x%08X, off_dt_strings=0x%08X, version=0x%08X\r\n",
@@ -31,7 +31,7 @@ void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
   if(rev32(header->magic) != FDT_MAGIC || rev32(header->version) != FDT_VERSION){
     uart_printf("Error, fdtb_parse(), expect magic,version=0x%08X, 0x%08X, got=0x%08X, 0x%08X. ", FDT_MAGIC, FDT_VERSION, rev32(header->magic), rev32(header->version));
     uart_printf("dtb_addr=0x%pX, totalsize=0x%08X\r\n", dtb_addr, rev32(header->totalsize));
-    return;
+    return -1;
   }
 
   // Parse tree blob
@@ -102,6 +102,7 @@ void fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
   }
 
   if(print) uart_printf("Parsing ends here\r\n");
+  return rev32(header->totalsize);
 }
 
 static uint64_t pad_to_4(void *num){
