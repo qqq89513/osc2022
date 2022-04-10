@@ -105,7 +105,7 @@ static void dump_chunk(){
       uart_printf("Page %d, usage = %d bytes\r\n", i, malloc_page_usage[i]);
       // Traverse all chunks in page #i
       while((uint64_t)header < GET_PAGE_ADDR(i+1)){ // limit at current page
-        uart_printf("\tchunk addr=%p, used=%d, size=%lu\r\n", header, header->used, (uint64_t)header->size);
+        uart_printf("\tusable addr=%p, used=%d, size=%lu\r\n", &header[1], header->used, (uint64_t)header->size);
         header = (chunk_header*) ( (uint64_t)header + header->size );
       }
     }
@@ -429,6 +429,13 @@ void *diy_malloc(size_t desire_size){
     dump_chunk();
   }
 
+  // Current page is freed in diy_free(), so allocate a new one
+  if(malloc_page_usage[curr_page] == -1){
+    curr_page = -1;
+    return diy_malloc(desire_size);
+  }
+
+
   /** An allocated block(chunk), allocated by diy_malloc, looks like this
    * | --8 byte header-- | ----free to use range---- |
    *                     ^
@@ -481,7 +488,66 @@ void *diy_malloc(size_t desire_size){
 
   // No free chunks, allocate a new page
   curr_page = -1;
-  return diy_malloc(desire_size - sizeof(chunk_header));
+  return diy_malloc(desire_size - sizeof(chunk_header)); // substract sizeof(chunk_header) because it was added for fir fit operation
 }
 
+void diy_free(void *addr){
+  chunk_header *header = addr - sizeof(chunk_header);
+  int page_num = GET_PAGE_NUM((uint64_t)addr);
+
+  // Check if freeing wron address
+  if(header->used == 0 || header->size < (sizeof(chunk_header)+1)){
+    uart_printf("Error, failed to free addr=%p, .used=%d, .size=%lu\r\n", addr, header->used, (uint64_t)header->size);
+    return;
+  }
+
+  // Mark this chunk unused and substract usage
+  header->used = 0;
+  malloc_page_usage[page_num] -= header->size;
+
+  // Free the page if all chunks are unsued
+  if(malloc_page_usage[page_num] == 0){
+    uart_printf("In diy_free(), all chunks in page %d is unused, freeing this page.\r\n", page_num);
+    malloc_page_usage[page_num] = -1;
+    free_page(page_num, 0);
+  }
+  // Merge neighbor unsed chunks
+  else if(malloc_page_usage[page_num] >= 0){
+    chunk_header *neighbor_chunk = NULL;
+    chunk_header *traverse_chunk = NULL;
+
+    // Merge forward
+    neighbor_chunk = (chunk_header*) ( (uint64_t)header + header->size ); // next chunk
+    if((uint64_t)neighbor_chunk < GET_PAGE_ADDR(page_num+1) && neighbor_chunk->used == 0){
+      header->size += neighbor_chunk->size;
+      neighbor_chunk->size = 0;
+    }
+
+    // Merge backward
+    // Traverse all chunks in page #page_num to get previous chunk
+    traverse_chunk = (chunk_header*) GET_PAGE_ADDR(page_num);
+    neighbor_chunk = traverse_chunk;  // chunk before traverse_chunk
+    while((uint64_t)traverse_chunk < GET_PAGE_ADDR(page_num+1)){ // limit at current page
+      // Next chunk
+      neighbor_chunk = traverse_chunk;
+      traverse_chunk = (chunk_header*) ( (uint64_t)traverse_chunk + traverse_chunk->size );
+      // Previous chunk found, 
+      // i.e., traverse_chunk is header, than header's previous chunk will be neighbor_chunk
+      if(traverse_chunk == header){
+        if(neighbor_chunk->used == 0){
+          neighbor_chunk->size += header->size;
+          header->size = 0;
+        }
+        break;
+      }
+    }
+  }
+  // Error
+  else if(malloc_page_usage[page_num] < 0){
+    uart_printf("Error, malloc_page_usage[%d]=%d, which should not be smaller than 0.\r\n", page_num, malloc_page_usage[page_num]);
+    return;
+  }
+
+  dump_chunk();
+}
 

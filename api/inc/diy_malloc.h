@@ -42,6 +42,7 @@ void dump_the_frame_array();
 void dupmp_frame_freelist_arr();
 
 void *diy_malloc(size_t size);
+void diy_free(void *addr);
 
 #ifdef __cplusplus
 }

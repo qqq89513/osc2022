@@ -65,6 +65,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
         uart_printf(CMD_DUMP_PAGE "\t: Dump the frame array and free block lists\r\n");
         uart_printf(CMD_MALLOC " <size>\t: Allocate memory, <size> in bytes\r\n");
+        uart_printf(CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -118,6 +119,15 @@ void main(void *dtb_addr)
         }
         else
           uart_printf("Usage: " CMD_MALLOC " <size>: Allocate memory, <size> in bytes\r\n");
+      }
+      else if(strcmp_(args[0], CMD_FREE) == 0){
+        if(args_cnt > 1){
+          void *addr = NULL;
+          sscanf_(args[1], "%p", &addr);
+          diy_free(addr);
+        }
+        else
+          uart_printf("Usage: " CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
