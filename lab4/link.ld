@@ -19,6 +19,9 @@ SECTIONS
     _bss_end = .;
   }
   . = ALIGN(8);
+  __simple_malloc_start = .;
+  . = . + 0x900000;
+  __simple_malloc_end = .;
   __image_end = .;
 
 }

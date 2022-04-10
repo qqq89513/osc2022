@@ -4,15 +4,18 @@
 #include "uart.h"
 
 // Simple memory allocation -----------------------------------------
+extern char __simple_malloc_start;
+extern char __simple_malloc_end;
 void* simple_malloc(size_t size){
-  static char pool[SIMPLE_MALLOC_POOL_SIZE];
-  static char *ptr = pool;
+  static char *ptr = &__simple_malloc_start;
   char *temp = ptr;
-  if(size < 1){
-    uart_printf("Error, not enough of SIMPLE_MALLOC_POOL_SIZE=%d, in simple_malloc()\r\n", SIMPLE_MALLOC_POOL_SIZE);
+  ptr += size;
+  if(ptr > &__simple_malloc_end){
+    uart_printf("Error, not enough of simple allocator size, in simple_malloc(). size=%ld\r\n", size);
+    uart_printf("__simple_malloc_start=%p, __simple_malloc_end=%p, ptr=%p\r\n", &__simple_malloc_start, &__simple_malloc_end, ptr);
+    uart_printf("simple malloc usage = %lu/%lu\r\n", (uint64_t)(ptr-&__simple_malloc_start), (uint64_t)(&__simple_malloc_end-&__simple_malloc_start));
     return NULL;
   }
-  ptr += size;
   return (void*) temp;
 }
 
@@ -304,7 +307,7 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
   // Init: allocate space 
   the_frame_array = (int*) simple_malloc(sizeof(int) * total_pages);
   freeframe_node_pool = (freeframe_node  *) simple_malloc(sizeof(freeframe_node) * total_pages);
-  freeframe_node_fifo = (freeframe_node **) simple_malloc(sizeof(freeframe_node) * total_pages + 1); // +1 to ease edge condition
+  freeframe_node_fifo = (freeframe_node **) simple_malloc(sizeof(freeframe_node) * (total_pages + 1)); // +1 to ease edge condition
   fifo_size = total_pages + 1;
   for(int i=0; i<total_pages; i++){
     free_freeframe_node(&freeframe_node_pool[i]);

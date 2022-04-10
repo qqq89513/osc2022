@@ -10,7 +10,6 @@ extern "C" {
 #include <stdint.h>
 
 // Simple memory allocation -----------------------------------------
-#define SIMPLE_MALLOC_POOL_SIZE 2048  // 2 kB
 void* simple_malloc(size_t size);
 
 
