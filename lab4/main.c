@@ -16,8 +16,10 @@
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
 #define CMD_LSDEV    "lsdev"
-#define CMD_ALLOCATE_PAGE "a"
-#define CMD_FREE_PAGE     "f"
+#define CMD_ALLOCATE_PAGE "ap"
+#define CMD_FREE_PAGE     "fp"
+#define CMD_MALLOC        "m"
+#define CMD_FREE          "f"
 #define CMD_DUMP_PAGE     "dump_page"
 
 #define ADDR_IMAGE_START 0x80000
@@ -62,6 +64,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
         uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
         uart_printf(CMD_DUMP_PAGE "\t: Dump the frame array and free block lists\r\n");
+        uart_printf(CMD_MALLOC " <size>\t: Allocate memory, <size> in bytes\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -105,6 +108,17 @@ void main(void *dtb_addr)
         // dump_the_frame_array();
         dupmp_frame_freelist_arr();
       }
+      else if(strcmp_(args[0], CMD_MALLOC) == 0){
+        if(args_cnt > 1){
+          int size = 0;
+          sscanf_(args[1], "%d", &size);
+          const void* addr = diy_malloc(size);
+          if(addr != NULL)   uart_printf("Allocated %d bytes at addr %p\r\n", size, addr);
+          else               uart_printf("Failed to malloc %d bytes\r\n", size);
+        }
+        else
+          uart_printf("Usage: " CMD_MALLOC " <size>: Allocate memory, <size> in bytes\r\n");
+      }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
     }
@@ -140,4 +154,5 @@ static void sys_init(void *dtb_addr){
   mem_reserve(0x8000000, 0x8000000 + 2560);                       // initramfs, hard coded
   mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
   alloc_page_init((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
+  // alloc_page_init(0, 4096*100);   // for demo, simple scenario
 }

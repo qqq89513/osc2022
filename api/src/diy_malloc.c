@@ -24,6 +24,8 @@ void* simple_malloc(size_t size){
 // Ref: https://oscapstone.github.io/labs/overview.html, https://grasslab.github.io/NYCU_Operating_System_Capstone/labs/lab3.html
 #define ITEM_COUNT(arr) (sizeof(arr) / sizeof(*arr))
 #define PAGE_SIZE 4096 // 4kB
+#define GET_PAGE_NUM(addr)        ( ((addr)-heap_start_addr)/PAGE_SIZE )
+#define GET_PAGE_ADDR(page_num)   ( heap_start_addr+(page_num)*PAGE_SIZE )
 
 #define MAX_CONTI_ALLOCATION_EXPO 16 // i.g. =6 means max allocation size is 4kB * 2^6
 #define FRAME_ARRAY_F -1            // The idx’th frame is free, but it belongs to a larger contiguous memory block. Hence, buddy system doesn’t directly allocate it.
@@ -31,6 +33,9 @@ void* simple_malloc(size_t size){
 #define FRAME_ARRAY_P -3            // The idx’th frame is preserved, not allocatable
 static int *the_frame_array;        // Has the size of (heap_size/PAGE_SIZE), i.e., total_pages
 static size_t total_pages = 0;      // = heal_size / PAGE_SIZE
+static uint64_t heap_start_addr = 0;// start address of heap
+
+static int *malloc_page_usage;      // used for malloc, malloc_page_usage[i] == k means that k bytes in page #i are allocated through malloc
 
 // Preserved memory block linked list
 memblock_node *preserved_memblocks_head = NULL;
@@ -90,6 +95,22 @@ void dupmp_frame_freelist_arr(){
     }
     uart_printf("NULL\r\n");
   }
+}
+static void dump_chunk(){
+  chunk_header *header = NULL;
+  // Dump the pages' chunk if they are allocated by diy_malloc()
+  for(int i=0; i<total_pages; i++){
+    header = (chunk_header*) GET_PAGE_ADDR(i); // header->size is the size of allocated block
+    if(malloc_page_usage[i] >= 0){
+      uart_printf("Page %d, usage = %d bytes\r\n", i, malloc_page_usage[i]);
+      // Traverse all chunks in page #i
+      while((uint64_t)header < GET_PAGE_ADDR(i+1)){ // limit at current page
+        uart_printf("\tchunk addr=%p, used=%d, size=%lu\r\n", header, header->used, (uint64_t)header->size);
+        header = (chunk_header*) ( (uint64_t)header + header->size );
+      }
+    }
+  }
+  uart_printf("\r\n");
 }
 
 int alloc_page(int page_cnt, int verbose){
@@ -162,7 +183,7 @@ int alloc_page(int page_cnt, int verbose){
     uart_printf("Error, not enough of pages. Required %d contiguous pages\r\n", page_cnt);
   }
   if(verbose){
-    dump_the_frame_array();
+    if(total_pages < 200) dump_the_frame_array();
     dupmp_frame_freelist_arr();
   }
   return page_allocated;
@@ -302,14 +323,17 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
   freeframe_node *freeframe_node_pool = NULL;
   const size_t heap_size = heap_end - heap_start;
   total_pages = (heap_size / PAGE_SIZE);
+  heap_start_addr = heap_start;
   uart_printf("total_pages=%ld, heap_size=%ld bytes\r\n", total_pages, heap_size);
 
-  // Init: allocate space 
+  // Init: allocate space
+  malloc_page_usage = (int*) simple_malloc(sizeof(int) * total_pages);
   the_frame_array = (int*) simple_malloc(sizeof(int) * total_pages);
   freeframe_node_pool = (freeframe_node  *) simple_malloc(sizeof(freeframe_node) * total_pages);
   freeframe_node_fifo = (freeframe_node **) simple_malloc(sizeof(freeframe_node) * (total_pages + 1)); // +1 to ease edge condition
   fifo_size = total_pages + 1;
   for(int i=0; i<total_pages; i++){
+    malloc_page_usage[i] = -1;
     free_freeframe_node(&freeframe_node_pool[i]);
   }
 
@@ -353,8 +377,8 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
     for(int i=0; i<total_pages; i++)  alloc_page(1, 0);
     // Mark preserved pages
     while(node != NULL){
-      const int start_page = (node->start_addr - heap_start) / PAGE_SIZE;
-      const int end_page = (node->end_addr - heap_start) / PAGE_SIZE;
+      const int start_page = GET_PAGE_NUM(node->start_addr);
+      const int end_page = GET_PAGE_NUM(node->end_addr);
       uart_printf("prevserved from page %d to %d\r\n", start_page, end_page);
       if(start_page >= 0 && end_page <= total_pages)
         for(int i=start_page; i<=end_page; i++)
@@ -377,3 +401,87 @@ void mem_reserve(uint64_t start, uint64_t end){
   node->next = preserved_memblocks_head;
   preserved_memblocks_head = node;
 }
+
+// diy_malloc, diy_free for small memory ---------------------------
+void *diy_malloc(size_t desire_size){
+  // TODO: Handle allocation for desire_size > (PAGE_SIZE-sizeof(chunk_header))
+  // TODO: Handle the case that unused chunks available, but new page needs to be allocated
+  //       Then the unused chunks is never reachable untill the page they belong to is freed.
+  
+  static int curr_page = -1; // current page allocation from
+
+  // Allocating a new page
+  if(curr_page == -1){
+    curr_page = alloc_page(1, 0);
+    if(curr_page < 0){ 
+      uart_printf("In diy_malloc(), failed to allocate a page.\r\n");
+      return NULL;
+    }
+    uart_printf("New page %d allocated by diy_malloc()\r\n", curr_page);
+    malloc_page_usage[curr_page] = 0;
+    size_t *page = (size_t *) GET_PAGE_ADDR(curr_page);
+    // Zero out the content of the page that just allocated
+    for(int i=0; i<PAGE_SIZE/sizeof(size_t); i++)
+      page[i] = 0;
+    chunk_header *header = (chunk_header*) page;
+    header->size = PAGE_SIZE;
+    header->used = 0;
+    dump_chunk();
+  }
+
+  /** An allocated block(chunk), allocated by diy_malloc, looks like this
+   * | --8 byte header-- | ----free to use range---- |
+   *                     ^
+   *                     |--> here is the address that diy_malloc() return
+   * 8 byte header: header.size indicates the length of the entire chunk, header.used indicates if the chunk is allocated
+   * free to use range: caller of diy_malloc() can use this range of memory, has lenght of (head.size - sizeof(header))
+  */
+
+  // First fit: find the first fittable hole
+  chunk_header *header = (chunk_header*) GET_PAGE_ADDR(curr_page); // header->size is the size of allocated block
+  void *ret = NULL;
+  desire_size += sizeof(chunk_header);
+  // Skip chunks that are used(allocated) or not big enough
+  while((header->used == 1 || header->size < desire_size) && (uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
+    header = (chunk_header*) ( (uint64_t)header + header->size );
+  }
+
+  // Free chunk found
+  if((uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
+    const int64_t left_over = header->size - desire_size;
+    // Chunk with exact same size found
+    if(left_over == 0){
+      header->size = desire_size;
+      header->used = 1;
+      malloc_page_usage[curr_page] += header->size;
+      ret = &header[1]; // return the address right after the header
+    }
+    // Chunk with larger size that can left a usable hole
+    else if(left_over >= (sizeof(chunk_header) + 1)){
+      header->size = desire_size;
+      header->used = 1;
+      malloc_page_usage[curr_page] += header->size;
+      ret = &header[1];
+      // Cut the original chunk, setup the leftover as a new chunk
+      header = (chunk_header*) ( (uint64_t)header + desire_size );
+      header->size = left_over;
+      header->used = 0;
+    }
+    // Chunk with larger size but left a unusabl hole
+    else{  // left_over < (sizeof(chunk_header) + 1)
+      header->size = header->size;
+      header->used = 1;
+      malloc_page_usage[curr_page] += header->size;
+      ret = &header[1];
+    }
+
+    dump_chunk();
+    return ret;
+  }
+
+  // No free chunks, allocate a new page
+  curr_page = -1;
+  return diy_malloc(desire_size - sizeof(chunk_header));
+}
+
+

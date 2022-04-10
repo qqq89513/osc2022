@@ -26,6 +26,12 @@ typedef struct __memblock_node{
   struct __memblock_node *next;
 } memblock_node;
 
+typedef struct __chunk_header{
+  uint8_t used : 1;
+  uint64_t size : 63; // has the size of whole chunk, including header and free to use block
+  // unsigned long long size : 63; // has the size of whole chunk, including header and free to use block
+} chunk_header;
+
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
 int alloc_page(int page_cnt, int verbose);
 int free_page(int page_index, int verbose);
@@ -34,6 +40,8 @@ void mem_reserve(uint64_t start, uint64_t end);
 // Dump functions
 void dump_the_frame_array();
 void dupmp_frame_freelist_arr();
+
+void *diy_malloc(size_t size);
 
 #ifdef __cplusplus
 }

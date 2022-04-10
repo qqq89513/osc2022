@@ -20,7 +20,8 @@ SECTIONS
   }
   . = ALIGN(8);
   __simple_malloc_start = .;
-  . = . + 0x900000;
+  . = . + 0x9F0000;
+  . = ALIGN(8);
   __simple_malloc_end = .;
   __image_end = .;
 
