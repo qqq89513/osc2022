@@ -19,6 +19,7 @@
 #define CMD_LSDEV    "lsdev"
 #define CMD_ALLOCATE_PAGE "a"
 #define CMD_FREE_PAGE     "f"
+#define CMD_DUMP_PAGE     "dump_page"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -66,6 +67,7 @@ void main(void *dtb_addr)
         uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
         uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
         uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
+        uart_printf(CMD_DUMP_PAGE "\t: Dump the frame array and free block lists\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -92,21 +94,25 @@ void main(void *dtb_addr)
         if(args_cnt > 1){
           int page_cnt = 0;
           sscanf_(args[1], "%d", &page_cnt);
-          const int page_index = alloc_page(page_cnt);
+          const int page_index = alloc_page(page_cnt, 0);
           if(page_index > -1)   uart_printf("Allocated %d at page #%d\r\n", page_cnt, page_index);
           else                  uart_printf("Error, not enough of contiguious space for page count=%d\r\n", page_cnt);
         }
         else
-          uart_printf("Usage: " CMD_ALLOCATE_PAGE "<page count>\t: Allocate <page count> from heap.\r\n");
+          uart_printf("Usage: " CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
       }
       else if(strcmp_(args[0], CMD_FREE_PAGE) == 0){
         if(args_cnt > 1){
           int page_index = 0;
           sscanf_(args[1], "%d", &page_index);
-          free_page(page_index);
+          free_page(page_index, 0);
         }
         else
           uart_printf("Usage: " CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
+      }
+      else if(strcmp_(args[0], CMD_DUMP_PAGE) == 0){
+        dump_the_frame_array();
+        dupmp_frame_freelist_arr();
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);

@@ -23,8 +23,12 @@ typedef struct __free_frame_node{
 
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
-int alloc_page(int page_cnt);
-int free_page(int page_index);
+int alloc_page(int page_cnt, int verbose);
+int free_page(int page_index, int verbose);
+
+// Dump functions
+void dump_the_frame_array();
+void dupmp_frame_freelist_arr();
 
 #ifdef __cplusplus
 }

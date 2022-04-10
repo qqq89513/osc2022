@@ -68,12 +68,12 @@ static int log2_floor(uint64_t x){
 }
 
 // Dump funcs
-static void dump_the_frame_array(){
+void dump_the_frame_array(){
   uart_printf("the_frame_array[] = ");
   for(int i=0; i<total_pages; i++)  uart_printf("%2d ", the_frame_array[i]);
   uart_printf("\r\n");
 }
-static void dupmp_frame_freelist_arr(){
+void dupmp_frame_freelist_arr(){
   uart_printf("frame_freelist_arr[] = \r\n");
   for(int i=MAX_CONTI_ALLOCATION_EXPO; i>=0; i--){
     freeframe_node *node = frame_freelist_arr[i];
@@ -86,7 +86,7 @@ static void dupmp_frame_freelist_arr(){
   }
 }
 
-int alloc_page(int page_cnt){
+int alloc_page(int page_cnt, int verbose){
   int curr_page_cnt = 0;
   int page_allocated = -1;
   freeframe_node *temp_node = NULL;
@@ -155,9 +155,10 @@ int alloc_page(int page_cnt){
   else {
     uart_printf("Error, not enough of pages. Required %d contiguous pages\r\n", page_cnt);
   }
-
-  dump_the_frame_array();
-  dupmp_frame_freelist_arr();
+  if(verbose){
+    dump_the_frame_array();
+    dupmp_frame_freelist_arr();
+  }
   return page_allocated;
 }
 
@@ -221,8 +222,8 @@ static int free_page_merge(int fflists_idx){
         the_frame_array[node->index] = block_size;
         for(int i=start_idx; i < end_idx; i++) the_frame_array[i] = FRAME_ARRAY_F;
         
-        uart_printf("Merging %d and %d into %d. merged block_size=%d, start_idx=%d, end_idx=%d\r\n", 
-          buddy_page, freeing_page, node->index, block_size, start_idx, end_idx);
+        // uart_printf("Merging %d and %d into %d. merged block_size=%d, start_idx=%d, end_idx=%d\r\n", 
+        //   buddy_page, freeing_page, node->index, block_size, start_idx, end_idx);
 
         return fflists_idx;
       }
@@ -241,7 +242,7 @@ static int free_page_merge(int fflists_idx){
 /** Free a page allocated from alloc_page()
  * @return 0 on success. -1 on error.
 */
-int free_page(int page_index){
+int free_page(int page_index, int verbose){
   int block_size = the_frame_array[page_index]; // How many contiguous pages to free
   int fflists_idx = log2_floor(block_size);
 
@@ -281,12 +282,13 @@ int free_page(int page_index){
   // Merge iterativly
   int fflists_merge = fflists_idx;
   while(fflists_merge >= 0){
-    dupmp_frame_freelist_arr();
+    if(verbose) dupmp_frame_freelist_arr();
     fflists_merge = free_page_merge(fflists_merge);
   }
-
-  dump_the_frame_array();
-  dupmp_frame_freelist_arr();
+  if(verbose){
+    dump_the_frame_array();
+    dupmp_frame_freelist_arr();
+  }
   return 0;
 }
 
@@ -334,9 +336,5 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
       i--;
     }
   }
-
-  // Dump frame array
-  dump_the_frame_array();
-  dupmp_frame_freelist_arr();
 }
 
