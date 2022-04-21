@@ -30,7 +30,7 @@ typedef struct __chunk_header{
   uint8_t used : 1;
   uint64_t size : 63; // has the size of whole chunk, including header and free to use block
   // unsigned long long size : 63; // has the size of whole chunk, including header and free to use block
-} chunk_header;
+} chunk_header; // sizeof(chunk_header) should be muliple of 8
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end);
 int alloc_page(int page_cnt, int verbose);

@@ -448,6 +448,7 @@ void *diy_malloc(size_t desire_size){
   chunk_header *header = (chunk_header*) GET_PAGE_ADDR(curr_page); // header->size is the size of allocated block
   void *ret = NULL;
   desire_size += sizeof(chunk_header);
+  desire_size += (8-(desire_size % 8)); // round up to 8
   // Skip chunks that are used(allocated) or not big enough
   while((header->used == 1 || header->size < desire_size) && (uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
     header = (chunk_header*) ( (uint64_t)header + header->size );
@@ -538,6 +539,7 @@ void diy_free(void *addr){
           neighbor_chunk->size += header->size;
           header->size = 0;
         }
+        else; // found neighbor chunk but it's in use, do nothing
         break;
       }
     }
