@@ -60,8 +60,15 @@ static int log2_floor(uint64_t x){
 void dump_the_frame_array(){
   uart_printf("Unused buddies: (index, the_frame_array[index].val) = ");
   for(int i=0; i<total_pages; i++){
-    if(the_frame_array[i].val > 0)
-      uart_printf("(%d:%ld) ", i, (uint64_t)the_frame_array[i].val);
+    if(the_frame_array[i].used == 0 && the_frame_array[i].val > 0)
+      uart_printf("(%d,%ld) ", i, (uint64_t)the_frame_array[i].val);
+  }
+  uart_printf("\r\n");
+
+  uart_printf("Used buddies:   (index, the_frame_array[index].val) = ");
+  for(int i=0; i<total_pages; i++){
+    if(the_frame_array[i].used == 1 && the_frame_array[i].val > 0)
+      uart_printf("(%d,%ld) ", i, (uint64_t)the_frame_array[i].val);
   }
   uart_printf("\r\n");
 }
@@ -303,6 +310,7 @@ int free_page(int page_index, int verbose){
   buddynode_insert_a_before_b(node, frame_freelist_arr[fflists_idx]);
   frame_freelist_arr[fflists_idx] = node;
   // Update the frame array
+  the_frame_array[page_index].used = 0;
   const int start_idx = page_index + 1;
   const int end_idx = page_index + block_size;
   for(int i=start_idx; i < end_idx; i++) the_frame_array[i].val = FRAME_ARRAY_F;

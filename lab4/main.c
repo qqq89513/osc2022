@@ -107,6 +107,7 @@ void main(void *dtb_addr)
       }
       else if(strcmp_(args[0], CMD_DUMP_PAGE) == 0){
         // dump_the_frame_array();
+        dump_the_frame_array();
         dupmp_frame_freelist_arr();
       }
       else if(strcmp_(args[0], CMD_MALLOC) == 0){
