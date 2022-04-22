@@ -160,10 +160,10 @@ static void sys_init(void *dtb_addr){
   uint32_t *mem_start_addr = 0;
   uint32_t mem_size = 0;
   mbox_arm_mem_info(&mem_start_addr, &mem_size);
+  alloc_page_preinit((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
   mem_reserve(0x0, 0x1000);                                       // spin tables for multicore boot
   mem_reserve((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
   mem_reserve(0x8000000, 0x8000000 + 2560);                       // initramfs, hard coded
   mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
-  alloc_page_init((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
-  // alloc_page_init(0, 4096*100);   // for demo, simple scenario
+  alloc_page_init();
 }

@@ -38,9 +38,6 @@ static uint64_t heap_start_addr = 0;// start address of heap
 
 static int *malloc_page_usage;      // used for malloc, malloc_page_usage[i] == k means that k bytes in page #i are allocated through malloc
 
-// Preserved memory block linked list
-memblock_node *preserved_memblocks_head = NULL;
-
 // frame_freelist_arr[i] points to the head of the linked list of free 4kB*(2^i) pages
 buddynode *frame_freelist_arr[MAX_CONTI_ALLOCATION_EXPO + 1] = {NULL};
 
@@ -328,7 +325,7 @@ int free_page(int page_index, int verbose){
   return 0;
 }
 
-void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
+void alloc_page_preinit(uint64_t heap_start, uint64_t heap_end){
   const size_t heap_size = heap_end - heap_start;
   total_pages = (heap_size / PAGE_SIZE);
   heap_start_addr = heap_start;
@@ -339,71 +336,83 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
   the_frame_array = (buddy_status*) simple_malloc(sizeof(buddy_status) * total_pages);
   for(int i=0; i<total_pages; i++){
     malloc_page_usage[i] = -1;
+    the_frame_array[i].val = FRAME_ARRAY_X;
+    the_frame_array[i].used = 1;
+  }
+}
+
+void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
+  if(total_pages == 0){
+    uart_printf("Error, please call alloc_page_preinit() first. in alloc_page_init()\r\n");
+    return;
   }
 
-  // Buddy system init
-  int left_pages = total_pages;
-  int buddy_page_cnt = 1 << MAX_CONTI_ALLOCATION_EXPO;
-  int i = MAX_CONTI_ALLOCATION_EXPO;
-  int frame_arr_idx = 0;
-  while(left_pages > 0 && buddy_page_cnt != 0){
-    if(left_pages >= buddy_page_cnt){
-      
-      // Insert a buddynode into the linked list frame_freelist_arr[i]
-      buddynode *node = GET_PAGE_BUDDY_NODE(frame_arr_idx);
-      buddynode_insert_a_before_b(node, frame_freelist_arr[i]);
-      frame_freelist_arr[i] = node; // update head
-      
-      // Fill the frame array
-      the_frame_array[frame_arr_idx].val = buddy_page_cnt;
-      the_frame_array[frame_arr_idx].used = 0;
-      for(int k=frame_arr_idx+1; k<(frame_arr_idx+buddy_page_cnt); k++){      // Fill value <F> for buddy of frame_arr_idx'th page
-        the_frame_array[k].val = FRAME_ARRAY_F;
-      }
-      frame_arr_idx += buddy_page_cnt;
+  // New efficient way
+  for(int p=0; p<total_pages; p++){
+    // Skip preserved pages
+    for(p=p; the_frame_array[p].val == FRAME_ARRAY_P && p<total_pages; p++){};
 
-      // Substract left pages
-      left_pages -= buddy_page_cnt;
+    // Page number is odd, block size is definitely 1
+    if(p%2 == 1){
+      int block_size = 1;
+      the_frame_array[p].val = 1;
+      the_frame_array[p].used = 0;
+      buddynode *node = GET_PAGE_BUDDY_NODE(p);
+      buddynode_insert_a_before_b(node, frame_freelist_arr[log2_floor(block_size)]);
+      frame_freelist_arr[log2_floor(block_size)] = node; // update head
+      continue;
     }
+
+    // Determine max block size starting from page p
+    int expo;
+    for(expo=MAX_CONTI_ALLOCATION_EXPO; expo>=0; expo--){
+      // p mod 2^expo == 0
+      if((p % (1<<expo)) == 0)
+        break;
+    }
+
+    // Adjust block_size if necessary, and than insert a free node into the linked list
+    if(expo < 0)
+      uart_printf("Error, expo<0, expo=%d, p=%d, should not get here. in alloc_page_init()\r\n", expo, p);
     else{
-      buddy_page_cnt = buddy_page_cnt >> 1;
-      i--;
+      // Check if from p ~ p+block_size are all preserved
+      int block_size = 1 << expo;
+      int k = 0;
+      for(k=p; k<(p+block_size) && the_frame_array[k].val!=FRAME_ARRAY_P && k<total_pages; k++);
+      // Shrink block size due to either:
+      //    some page in the block is reserved, or,
+      //    amount of remaining pages cannot satisfy the block size
+      if(the_frame_array[k].val == FRAME_ARRAY_P || k >= total_pages){
+        block_size = 1 << log2_floor(k-p);  // shrink block size
+        uart_printf("Debug: p=%d, k=%d, expect_size=%d, block_size=%d\r\n", p, k, 1<<expo, block_size);
+      }
+
+      // Insert a free node into the linked list
+      the_frame_array[p].val = block_size;
+      the_frame_array[p].used = 0;
+      // free_page(p, 0);
+      buddynode *node = GET_PAGE_BUDDY_NODE(p);
+      buddynode_insert_a_before_b(node, frame_freelist_arr[log2_floor(block_size)]);
+      frame_freelist_arr[log2_floor(block_size)] = node; // update head
+      p = p + block_size - 1;
     }
   }
-  /*  Underconstruction: Preserve pages
-  //  1. allocate all pages, 1 page at a time
-  //  2. mark preserved pages in the the_frame_array[]
-  //  3. free the pages that's not mark as preserved
-  memblock_node *node = preserved_memblocks_head;
-  if(node != NULL){
-    // Allocate all pages
-    for(int i=0; i<total_pages; i++)  alloc_page(1, 0);
-    // Mark preserved pages
-    while(node != NULL){
-      const int start_page = GET_PAGE_NUM(node->start_addr);
-      const int end_page = GET_PAGE_NUM(node->end_addr);
-      uart_printf("prevserved from page %d to %d\r\n", start_page, end_page);
-      if(start_page >= 0 && end_page <= total_pages)
-        for(int i=start_page; i<=end_page; i++)
-          the_frame_array[i].val = FRAME_ARRAY_P;
-      node = node->next;
-    }
-    // Free not preserved pages
-    for(int i=0; i<total_pages; i++){
-      if(the_frame_array[i].val != FRAME_ARRAY_P)
-        free_page(i, 0);
-    }
-  }
-  */
 }
 
 void mem_reserve(uint64_t start, uint64_t end){
-  // Insert a node to the head of preserved memblocks linked list
-  memblock_node *node = (memblock_node*) simple_malloc(sizeof(memblock_node));
-  node->start_addr = start;
-  node->end_addr = end;
-  node->next = preserved_memblocks_head;
-  preserved_memblocks_head = node;
+  const int start_page = GET_PAGE_NUM(start);
+  const int end_page = GET_PAGE_NUM(end);
+  if(start_page < 0 || end_page < 0 || start_page >= total_pages || end_page >= total_pages || start_page > end_page){
+    uart_printf("Error, wrong memory reserve range, start=0x%lX, end=0x%lX, start_page=%d, end_page=%d\r\n",
+      start, end, start_page, end_page);
+    return;
+  }
+  uart_printf("prevserved from page %d to %d\r\n", start_page, end_page);
+  if(start_page >= 0 && end_page <= total_pages)
+    for(int i=start_page; i<=end_page; i++){
+      the_frame_array[i].val = FRAME_ARRAY_P;
+      the_frame_array[i].used = 1;
+    }
 }
 
 // diy_malloc, diy_free for small memory ---------------------------
