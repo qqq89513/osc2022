@@ -18,9 +18,10 @@ SECTIONS
     _bss_end = .;
   }
   . = ALIGN(8);
+  __image_end = .;
   __simple_malloc_start = .;
-  . = . + 0x900000;
-  __simple_malloc_end = .;
-  end = .;
+  /* __simple_malloc_end is determined at run time*/
+
+  __simple_malloc_end_no_paging = . + 0x18000; /* for non paging usage, 96kB */
 }
 _bss_size = (_bss_end - _bss_start)>>3;  /* >>3 is devided by 8, (_bss_end - _bss_start) is size in bytes, _bss_size is size in double_word (64 bits) */

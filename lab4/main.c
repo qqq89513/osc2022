@@ -33,11 +33,10 @@ void main(void *dtb_addr)
   char **args;
   int args_cnt = 0;
 
+  sys_init(dtb_addr);
+
   input_s = simple_malloc(sizeof(char) * 32);
   args = simple_malloc(sizeof(char*) * 10);
-
-
-  sys_init(dtb_addr);
 
   // say hello
   uart_printf("\r\n\r\n");

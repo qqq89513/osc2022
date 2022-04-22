@@ -5,15 +5,23 @@
 
 // Simple memory allocation -----------------------------------------
 extern char __simple_malloc_start;
-extern char __simple_malloc_end;
+extern char __simple_malloc_end_no_paging;
+static char *__simple_malloc_end = 0x00;
 void* simple_malloc(size_t size){
   static char *ptr = &__simple_malloc_start;
   char *temp = ptr;
   ptr += size;
-  if(ptr > &__simple_malloc_end){
+  if(__simple_malloc_end == 0){
+    uart_printf("Simple malloc init, no paging, ");
+    uart_printf("__simple_malloc_start=%p, __simple_malloc_end_no_paging=%p, size=%lu\r\n",
+      &__simple_malloc_start, &__simple_malloc_end_no_paging, (uint64_t)&__simple_malloc_end_no_paging - (uint64_t)&__simple_malloc_start);
+
+    __simple_malloc_end = &__simple_malloc_end_no_paging;
+  }
+  if(ptr > __simple_malloc_end){
     uart_printf("Error, not enough of simple allocator size, in simple_malloc(). size=%ld\r\n", size);
-    uart_printf("__simple_malloc_start=%p, __simple_malloc_end=%p, ptr=%p\r\n", &__simple_malloc_start, &__simple_malloc_end, ptr);
-    uart_printf("simple malloc usage = %lu/%lu\r\n", (uint64_t)(ptr-&__simple_malloc_start), (uint64_t)(&__simple_malloc_end-&__simple_malloc_start));
+    uart_printf("__simple_malloc_start=%p, __simple_malloc_end=%p, ptr=%p\r\n", &__simple_malloc_start, __simple_malloc_end, ptr);
+    uart_printf("simple malloc usage = %lu/%lu\r\n", (uint64_t)(ptr-&__simple_malloc_start), (uint64_t)(__simple_malloc_end-&__simple_malloc_start));
     return NULL;
   }
   return (void*) temp;
@@ -331,6 +339,13 @@ void alloc_page_preinit(uint64_t heap_start, uint64_t heap_end){
   heap_start_addr = heap_start;
   uart_printf("total_pages=%ld, heap_size=%ld bytes\r\n", total_pages, heap_size);
 
+  // Calculate __simple_malloc_end
+  uint64_t simple_malloc_last_byte = (uint64_t) &__simple_malloc_start;
+  simple_malloc_last_byte += sizeof(int) * total_pages;           // for malloc_page_usage
+  simple_malloc_last_byte += sizeof(buddy_status) * total_pages;  // for the_frame_array
+  simple_malloc_last_byte += (16 - (simple_malloc_last_byte%16)); // round to multiple of 16
+  __simple_malloc_end = (char*)( simple_malloc_last_byte + 1024); // add 1024 for other purpose
+  uart_printf("__simple_malloc_start=%p, __simple_malloc_end=%p\r\n", &__simple_malloc_start, __simple_malloc_end);
   // Init: allocate space
   malloc_page_usage = (int*) simple_malloc(sizeof(int) * total_pages);
   the_frame_array = (buddy_status*) simple_malloc(sizeof(buddy_status) * total_pages);
@@ -339,6 +354,9 @@ void alloc_page_preinit(uint64_t heap_start, uint64_t heap_end){
     the_frame_array[i].val = FRAME_ARRAY_X;
     the_frame_array[i].used = 1;
   }
+
+  // Preserve space for simple_malloc()
+  mem_reserve((uint64_t)&__simple_malloc_start, (uint64_t)__simple_malloc_end);
 }
 
 void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
@@ -384,7 +402,7 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
       //    amount of remaining pages cannot satisfy the block size
       if(the_frame_array[k].val == FRAME_ARRAY_P || k >= total_pages){
         block_size = 1 << log2_floor(k-p);  // shrink block size
-        uart_printf("Debug: p=%d, k=%d, expect_size=%d, block_size=%d\r\n", p, k, 1<<expo, block_size);
+        // uart_printf("Debug: p=%d, k=%d, expect_size=%d, block_size=%d\r\n", p, k, 1<<expo, block_size);
       }
 
       // Insert a free node into the linked list
