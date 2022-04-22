@@ -15,10 +15,16 @@ void* simple_malloc(size_t size);
 
 // Buddy system -----------------------------------------------------
 
-typedef struct __free_frame_node{
-  int index;  // index to the frame array
-  struct __free_frame_node *next;
-} freeframe_node;
+// Considered as a header in an unallocated buddy, pointing next and previous buddy's header with the same buddy size
+typedef struct buddynode{
+  struct buddynode *prev; // Null for head
+  struct buddynode *next; // Null for end
+} buddynode;
+
+typedef struct buddy_status{
+  uint8_t used : 1;    // is the buddy is allocated, is used or not
+  int64_t val : 63;  // >1 for buddy size, or FRAME_ARRAY_F, FRAME_ARRAY_X, FRAME_ARRAY_P
+} buddy_status;
 
 typedef struct __memblock_node{
   uint64_t start_addr;
