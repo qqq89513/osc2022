@@ -287,7 +287,7 @@ int free_page(int page_index, int verbose){
     buddynode *node = frame_freelist_arr[fflists_idx];
     // Search for page_index in the linked list
     while(node != NULL){
-      if(the_frame_array[GET_PAGE_NUM((uint64_t)node)].val == page_index){
+      if(GET_PAGE_NUM((uint64_t)node) == page_index){
         uart_printf("Error, freeing wrong page. Page %d is already in free lists. block_size=%d\r\n", page_index, block_size);
         return -1;
       }
