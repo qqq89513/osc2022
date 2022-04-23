@@ -480,62 +480,90 @@ void *diy_malloc(size_t desire_size){
   void *ret = NULL;
   desire_size += sizeof(chunk_header);
   desire_size += (8-(desire_size % 8)); // round up to 8
-  // Skip chunks that are used(allocated) or not big enough
-  while((header->used == 1 || header->size < desire_size) && (uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
-    header = (chunk_header*) ( (uint64_t)header + header->size );
+
+  // Large request, allocate pages for the request
+  if(desire_size >= PAGE_SIZE){
+    // Calculate how many pages need to be allocate
+    const int pages = desire_size / PAGE_SIZE + ((desire_size%PAGE_SIZE) != 0);   // ceil(desire_size / PAGE_SIZE)
+    // Allocate pages
+    const int allocated_page = alloc_page(pages, 0);
+    for(int i=allocated_page; i<allocated_page+pages; i++)
+      malloc_page_usage[i] = PAGE_SIZE;
+
+    return (void*) GET_PAGE_ADDR(allocated_page);
   }
-
-  // Free chunk found
-  if((uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
-    const int64_t left_over = header->size - desire_size;
-    // Chunk with exact same size found
-    if(left_over == 0){
-      header->size = desire_size;
-      header->used = 1;
-      malloc_page_usage[curr_page] += header->size;
-      ret = &header[1]; // return the address right after the header
-    }
-    // Chunk with larger size that can left a usable hole
-    else if(left_over >= (sizeof(chunk_header) + 1)){
-      header->size = desire_size;
-      header->used = 1;
-      malloc_page_usage[curr_page] += header->size;
-      ret = &header[1];
-      // Cut the original chunk, setup the leftover as a new chunk
-      header = (chunk_header*) ( (uint64_t)header + desire_size );
-      header->size = left_over;
-      header->used = 0;
-    }
-    // Chunk with larger size but left a unusabl hole
-    else{  // left_over < (sizeof(chunk_header) + 1)
-      header->size = header->size;
-      header->used = 1;
-      malloc_page_usage[curr_page] += header->size;
-      ret = &header[1];
+  // Small request, find free chunks in  curr_page
+  else{
+    // First fit: find the first fittable hole
+    // Skip chunks that are used(allocated) or not big enough
+    while((header->used == 1 || header->size < desire_size) && (uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
+      header = (chunk_header*) ( (uint64_t)header + header->size );
     }
 
-    dump_chunk();
-    return ret;
+    // Free chunk found
+    if((uint64_t)header < GET_PAGE_ADDR(curr_page+1)){
+      const int64_t left_over = header->size - desire_size;
+      // Chunk with exact same size found
+      if(left_over == 0){
+        header->size = desire_size;
+        header->used = 1;
+        malloc_page_usage[curr_page] += header->size;
+        ret = &header[1]; // return the address right after the header
+      }
+      // Chunk with larger size that can left a usable hole
+      else if(left_over >= (sizeof(chunk_header) + 1)){
+        header->size = desire_size;
+        header->used = 1;
+        malloc_page_usage[curr_page] += header->size;
+        ret = &header[1];
+        // Cut the original chunk, setup the leftover as a new chunk
+        header = (chunk_header*) ( (uint64_t)header + desire_size );
+        header->size = left_over;
+        header->used = 0;
+      }
+      // Chunk with larger size but left a unusabl hole
+      else{  // left_over < (sizeof(chunk_header) + 1)
+        header->size = header->size;
+        header->used = 1;
+        malloc_page_usage[curr_page] += header->size;
+        ret = &header[1];
+      }
+
+      dump_chunk();
+      return ret;
+    }
+
+    // No free chunks, allocate a new page
+    curr_page = -1;
+    return diy_malloc(desire_size - sizeof(chunk_header)); // substract sizeof(chunk_header) because it was added for fir fit operation
   }
-
-  // No free chunks, allocate a new page
-  curr_page = -1;
-  return diy_malloc(desire_size - sizeof(chunk_header)); // substract sizeof(chunk_header) because it was added for fir fit operation
 }
 
 void diy_free(void *addr){
   chunk_header *header = addr - sizeof(chunk_header);
   int page_num = GET_PAGE_NUM((uint64_t)addr);
 
-  // Check if freeing wron address
-  if(header->used == 0 || header->size < (sizeof(chunk_header)+1)){
-    uart_printf("Error, failed to free addr=%p, .used=%d, .size=%lu\r\n", addr, header->used, (uint64_t)header->size);
+  // Free pages
+  if((((uint64_t)addr - heap_start_addr) % PAGE_SIZE) == 0){
+    const int page_size = the_frame_array[page_num].val;
+    free_page(page_num, 0);
+    for(int i=page_num; i<page_num+page_size; i++)
+      malloc_page_usage[i] = -1;
+
     return;
   }
+  // Free chunk
+  else{
+    // Check if freeing wrong address
+    if(header->used == 0 || header->size < (sizeof(chunk_header)+1)){
+      uart_printf("Error, failed to free addr=%p, .used=%d, .size=%lu\r\n", addr, header->used, (uint64_t)header->size);
+      return;
+    }
 
-  // Mark this chunk unused and substract usage
-  header->used = 0;
-  malloc_page_usage[page_num] -= header->size;
+    // Mark this chunk unused and substract usage
+    header->used = 0;
+    malloc_page_usage[page_num] -= header->size;
+  }
 
   // Free the page if all chunks are unsued
   if(malloc_page_usage[page_num] == 0){
