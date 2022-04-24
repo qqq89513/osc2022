@@ -58,28 +58,28 @@ exception_vector_table_el1:
   // code ref: https://github.com/13579and2468/osc2022/blob/lab3/lab3/src/entry.S
 
   //Exception from the current EL while using SP_EL0
-  align7_b  sync_invalid_el1t_ex_handler        // Synchronous EL1t
-  align7_b  irq_invalid_el1t_ex_handler         // IRQ EL1t
-  align7_b  fiq_invalid_el1t_ex_handler         // FIQ EL1t
-  align7_b  error_invalid_el1t_ex_handler       // Error EL1t
+  align7_b  sync_invalid_el1t_ex_handler        // Synchronous EL1t         | cause: 1
+  align7_b  irq_invalid_el1t_ex_handler         // IRQ EL1t                 | cause: 2
+  align7_b  fiq_invalid_el1t_ex_handler         // FIQ EL1t                 | cause: 3
+  align7_b  error_invalid_el1t_ex_handler       // Error EL1t               | cause: 4
   
   //Exception from the current EL while using SP_ELx
-  align7_b  sync_el1h_ex_handler                // Synchronous EL1h  
-  align7_b  irq_el1h_ex_handler                 // IRQ EL1h  
-  align7_b  fiq_invalid_el1h_ex_handler         // FIQ EL1h
-  align7_b  error_invalid_el1h_ex_handler       // Error EL1h
+  align7_b  sync_el1h_ex_handler                // Synchronous EL1h         | cause: 5
+  align7_b  irq_el1h_ex_handler                 // IRQ EL1h                 | cause: 6
+  align7_b  fiq_invalid_el1h_ex_handler         // FIQ EL1h                 | cause: 7
+  align7_b  error_invalid_el1h_ex_handler       // Error EL1h               | cause: 8
 
   //Exception from a lower EL and at least one lower EL is AArch64
-  align7_b  sync_el0_64_ex_handler              // Synchronous 64-bit EL0
-  align7_b  irq_el0_64_ex_handler               // IRQ 64-bit EL0
-  align7_b  fiq_invalid_el0_64_ex_handler       // FIQ 64-bit EL0
-  align7_b  error_invalid_el0_64_ex_handler     // Error 64-bit EL0
+  align7_b  sync_el0_64_ex_handler              // Synchronous 64-bit EL0   | cause: 9
+  align7_b  irq_el0_64_ex_handler               // IRQ 64-bit EL0           | cause: 10
+  align7_b  fiq_invalid_el0_64_ex_handler       // FIQ 64-bit EL0           | cause: 11
+  align7_b  error_invalid_el0_64_ex_handler     // Error 64-bit EL0         | cause: 12
       
   //Exception from a lower EL and at least all lower EL are AArch32
-  align7_b  sync_invalid_el0_32_ex_handler      // Synchronous 32-bit EL0
-  align7_b  irq_invalid_el0_32_ex_handler       // IRQ 32-bit EL0
-  align7_b  fiq_invalid_el0_32_ex_handler       // FIQ 32-bit EL0
-  align7_b  error_invalid_el0_32_ex_handler     // Error 32-bit EL0
+  align7_b  sync_invalid_el0_32_ex_handler      // Synchronous 32-bit EL0   | cause: 13
+  align7_b  irq_invalid_el0_32_ex_handler       // IRQ 32-bit EL0           | cause: 14
+  align7_b  fiq_invalid_el0_32_ex_handler       // FIQ 32-bit EL0           | cause: 15
+  align7_b  error_invalid_el0_32_ex_handler     // Error 32-bit EL0         | cause: 16
   .align 7
 
 // Set exception vector table for execeptions raised from el0
@@ -108,28 +108,132 @@ irq_el0_64_ex_handler:
   load_all
   eret
 
-unimplemented_ex_handler:
 sync_invalid_el1t_ex_handler:
-irq_invalid_el1t_ex_handler:
-fiq_invalid_el1t_ex_handler:
-error_invalid_el1t_ex_handler:
-sync_el1h_ex_handler:
-fiq_invalid_el1h_ex_handler:
-error_invalid_el1h_ex_handler:
-sync_el0_64_ex_handler:
-fiq_invalid_el0_64_ex_handler:
-error_invalid_el0_64_ex_handler:
-sync_invalid_el0_32_ex_handler:
-irq_invalid_el0_32_ex_handler:
-fiq_invalid_el0_32_ex_handler:
-error_invalid_el0_32_ex_handler:
   save_all
-  // void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1)
+  // void unhandled_exception(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause);
+  // defined in main.c
   // mrs a, b: Write system coprocessor register to arm register a
   mrs x0, spsr_el1
   mrs x1, elr_el1
   mrs x2, esr_el1
-  bl  dump_3_regs    // defined in main.c
+  mov x3, 1
+  bl  unhandled_exception
+  load_all
+  eret
+irq_invalid_el1t_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 2
+  bl  unhandled_exception
+  load_all
+  eret
+fiq_invalid_el1t_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 3
+  bl  unhandled_exception
+  load_all
+  eret
+error_invalid_el1t_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 4
+  bl  unhandled_exception
+  load_all
+  eret
+sync_el1h_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 5
+  bl  unhandled_exception
+  load_all
+  eret
+fiq_invalid_el1h_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 7
+  bl  unhandled_exception
+  load_all
+  eret
+error_invalid_el1h_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 8
+  bl  unhandled_exception
+  load_all
+  eret
+sync_el0_64_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 9
+  bl  unhandled_exception
+  load_all
+  eret
+fiq_invalid_el0_64_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 11
+  bl  unhandled_exception
+  load_all
+  eret
+error_invalid_el0_64_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 12
+  bl  unhandled_exception
+  load_all
+  eret
+sync_invalid_el0_32_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 13
+  bl  unhandled_exception
+  load_all
+  eret
+irq_invalid_el0_32_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 14
+  bl  unhandled_exception
+  load_all
+  eret
+fiq_invalid_el0_32_ex_handler:
+  save_all
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 15
+  bl  unhandled_exception
+  load_all
+  eret
+error_invalid_el0_32_ex_handler:
+  mrs x0, spsr_el1
+  mrs x1, elr_el1
+  mrs x2, esr_el1
+  mov x3, 16
+  bl  unhandled_exception
   load_all
   eret
 

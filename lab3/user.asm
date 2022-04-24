@@ -10,7 +10,7 @@ _start:
     mov x2, 0xdead
 1:
     add x1, x1, 1
-    svc 0           // exeception raised here, jumpping to el1 exeception_handler in vect_table_and_execption_handler.S
+    svc 0           // exeception raised here, jumpping to el1 sync_el0_64_ex_handler in vect_table_and_execption_handler.S
                     // it saves pc+4 to elr_el1. So that after exeception is handled in el1, eret can jump back to here
     cmp x1, 5
     blt 1b

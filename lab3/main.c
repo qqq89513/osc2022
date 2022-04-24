@@ -32,7 +32,7 @@ extern void from_el1_to_el0(); // defined in start.S
 extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp); // defined in start.S
 
 // Globals defined here
-void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1);
+void unhandled_exception(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause);
 void c_irq_handler_timer(uint64_t ticks, uint64_t freq);
 void c_irq_el1h_ex_handler();
 
@@ -171,9 +171,9 @@ void main(void *dtb_addr)
   }
 }
 
-void dump_3_regs(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1){
-  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX\r\n",
-    spsr_el1, elr_el1, esr_el1);
+void unhandled_exception(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause){
+  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
+    spsr_el1, elr_el1, esr_el1, cause);
 }
 
 void c_irq_handler_timer(uint64_t ticks, uint64_t freq){
