@@ -100,7 +100,6 @@ void idle(){
   while(1){
     // TODO: Kill exited (zombie)
     // TODO: Make shell here
-    uart_printf("Entered idle\r\n");
     clean_exited();
     schedule();
   }

@@ -30,18 +30,13 @@ void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
 static void foo();
+static void shell();
 extern uint64_t __image_start, __image_end;
 extern uint64_t __stack_start, __stack_end;
 void main(void *dtb_addr)
 {
-  char *input_s;
-  char **args;
-  int args_cnt = 0;
 
   sys_init(dtb_addr);
-
-  input_s = simple_malloc(sizeof(char) * 32);
-  args = simple_malloc(sizeof(char*) * 10);
 
   // say hello
   uart_printf("\r\n\r\n");
@@ -50,13 +45,78 @@ void main(void *dtb_addr)
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
 
   thread_init();
+  thread_create(shell, KERNEL);
   for(int i=0; i<6; i++) {
     thread_create(foo, KERNEL);
   }
   r_q_dump();
   idle();
 
+}
+
+static int spilt_strings(char** str_arr, char* str, char* deli){
+  int count = 0;
+  // Spilt str by specified delimeter
+  str_arr[0] = strtok_(str, deli);
+  count = 0;
+  while(str_arr[count] != NULL){
+    count++;
+    str_arr[count] = strtok_(NULL, deli);
+  }
+  return count;
+}
+
+static void sys_init(void *dtb_addr){
+  
+  // IO init
+  uart_init();
+
+  // Device tree parse
+  const long int dtb_size = fdtb_parse(dtb_addr, 0, cpio_parse);
+
+  // Memory init
+  uint32_t *mem_start_addr = 0;
+  uint32_t mem_size = 0;
+  mbox_arm_mem_info(&mem_start_addr, &mem_size);
+  alloc_page_preinit((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
+  mem_reserve(0x0, 0x1000);                                       // spin tables for multicore boot
+  mem_reserve((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
+  mem_reserve((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
+  mem_reserve(0x8000000, 0x8000000 + 247296);                     // initramfs, hard coded
+  mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
+  alloc_page_init();
+}
+
+void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause){
+  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
+    spsr_el1, elr_el1, esr_el1, cause);
+}
+
+static void foo(){
+  thread_t *thd = thread_get_current();
+  // lr == foo()
+  for(int i=0; i<4; ++i) {    
+    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
+      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
+    uint64_t tk;
+    WAIT_TICKS(tk, 20000000);
+    schedule();
+  }
+  if(thd->pid == 3){
+    kill(4);
+    kill(5);
+  }
+  uart_printf("pid %d exiting\r\n", thd->pid);  // killed thread will not be here
+  exit();
+}
+
+static void shell(){
+  char input_s[64];
+  char *args[10];
+  int args_cnt = 0;
+
   while(1) {
+    schedule();
 
     // Read cmd
     uart_printf(MACHINE_NAME);
@@ -94,7 +154,7 @@ void main(void *dtb_addr)
           cpio_cat(args[1]);
       }
       else if(strcmp_(args[0], CMD_LSDEV) == 0){
-        fdtb_parse(dtb_addr, 1, NULL);
+        // fdtb_parse(dtb_addr, 1, NULL);
       }
       else if(strcmp_(args[0], CMD_ALLOCATE_PAGE) == 0){
         if(args_cnt > 1){
@@ -145,60 +205,4 @@ void main(void *dtb_addr)
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
     }
   }
-}
-
-static int spilt_strings(char** str_arr, char* str, char* deli){
-  int count = 0;
-  // Spilt str by specified delimeter
-  str_arr[0] = strtok_(str, deli);
-  count = 0;
-  while(str_arr[count] != NULL){
-    count++;
-    str_arr[count] = strtok_(NULL, deli);
-  }
-  return count;
-}
-
-static void sys_init(void *dtb_addr){
-  
-  // IO init
-  uart_init();
-
-  // Device tree parse
-  const long int dtb_size = fdtb_parse(dtb_addr, 0, cpio_parse);
-
-  // Memory init
-  uint32_t *mem_start_addr = 0;
-  uint32_t mem_size = 0;
-  mbox_arm_mem_info(&mem_start_addr, &mem_size);
-  alloc_page_preinit((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
-  mem_reserve(0x0, 0x1000);                                       // spin tables for multicore boot
-  mem_reserve((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
-  mem_reserve((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
-  mem_reserve(0x8000000, 0x8000000 + 247296);                     // initramfs, hard coded
-  mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
-  alloc_page_init();
-}
-
-void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause){
-  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
-    spsr_el1, elr_el1, esr_el1, cause);
-}
-
-static void foo(){
-  thread_t *thd = thread_get_current();
-  // lr == foo()
-  for(int i=0; i<4; ++i) {    
-    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
-      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
-    uint64_t tk;
-    WAIT_TICKS(tk, 50000000);
-    schedule();
-  }
-  if(thd->pid == 2){
-    kill(3);
-    kill(4);
-  }
-  uart_printf("pid %d exiting\r\n", thd->pid);  // killed thread will not be here
-  exit();
 }
