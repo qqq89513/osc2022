@@ -1,6 +1,6 @@
 // save general registers to stack
 .macro save_all
-  sub sp, sp, 32 * 8
+  sub sp, sp, 16 * 19
   stp x0, x1, [sp ,16 * 0]
   stp x2, x3, [sp ,16 * 1]
   stp x4, x5, [sp ,16 * 2]
@@ -17,6 +17,14 @@
   stp x26, x27, [sp ,16 * 13]
   stp x28, x29, [sp ,16 * 14]
   str x30, [sp, 16 * 15]
+
+  // For nested interrupt, i.e. exeception triggered during handling exeception
+  mrs x0,  spsr_el1
+  str x0,  [sp, 16 * 16]
+  mrs x0,  elr_el1
+  str x0,  [sp, 16 * 17]
+  mrs x0,  esr_el1
+  str x0,  [sp, 16 * 18]
 .endm
 
 // load general registers from stack
@@ -37,7 +45,19 @@
   ldp x26, x27, [sp ,16 * 13]
   ldp x28, x29, [sp ,16 * 14]
   ldr x30, [sp, 16 * 15]
-  add sp, sp, 32 * 8
+
+  // For nested interrupt, i.e. exeception triggered during handling exeception
+  ldr x0,         [sp, 16 * 16]
+  msr spsr_el1,   x0
+  ldr x0,         [sp, 16 * 17]
+  msr elr_el1,    x0
+  ldr x0,         [sp, 16 * 18]
+  msr esr_el1,    x0
+
+  // Restore x0
+  ldp x0, x1, [sp ,16 * 0]
+
+  add sp, sp, 16 * 19
 .endm
 
 // Align 7 and branch to label
