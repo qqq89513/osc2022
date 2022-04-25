@@ -27,6 +27,7 @@
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
 extern uint64_t __image_start, __image_end;
+extern uint64_t __stack_start, __stack_end;
 void main(void *dtb_addr)
 {
   char *input_s;
@@ -162,6 +163,7 @@ static void sys_init(void *dtb_addr){
   alloc_page_preinit((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
   mem_reserve(0x0, 0x1000);                                       // spin tables for multicore boot
   mem_reserve((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
+  mem_reserve((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
   mem_reserve(0x8000000, 0x8000000 + 2560);                       // initramfs, hard coded
   mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
   alloc_page_init();

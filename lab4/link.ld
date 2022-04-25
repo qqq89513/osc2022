@@ -2,6 +2,8 @@
 SECTIONS
 {
   . = 0x80000;               /* set . counter to Initial address */
+  __stack_start = .;
+  __stack_end = . - 0x2000;  /* 8kB stack, stack grows downward */
   __image_start = .;
   . = ALIGN(8);
   .text : { *(.text*) }      /* text section */
