@@ -28,6 +28,7 @@
 .global _start
 .global from_el1_to_el0
 .global from_el1_to_el0_remote
+.global switch_to
 
 _start:
     // read cpu id, stop slave cores
@@ -124,3 +125,34 @@ from_el1_to_el0_remote:
     // set the user program’s stack pointer to a proper position by setting sp_el0.
     msr sp_el0,    x2           // set stack of el0 as orinary stack pointer
     eret                        // jump to user code (jump to elr_el1)
+
+
+/* Context switch from curr thread to next thread. 
+    Save curr context to curr's own stack, update the sp to next's, and than jump to next->lr.
+    Invoke from C, otherwise x0~x15 should be saved to stack.
+    This function is only available in el1. Invoking in el0 raises synchornous exeception.
+    void switch_to(thread_t *curr, thread_t *next);
+    @param curr (x0): 
+    @param next (x1): 
+ */ 
+switch_to:
+    stp x19, x20, [x0, 16 * 0]  // curr->x19=x19, curr->x20=x20
+    stp x21, x22, [x0, 16 * 1]
+    stp x23, x24, [x0, 16 * 2]
+    stp x25, x26, [x0, 16 * 3]
+    stp x27, x28, [x0, 16 * 4]
+    stp fp, lr, [x0, 16 * 5]
+    mov x9, sp                  // x9 is corruptible register, caller saved
+    str x9, [x0, 16 * 6]        // curr->sp = sp
+
+    ldp x19, x20, [x1, 16 * 0]  // next->x19=x19, next->x20=x20
+    ldp x21, x22, [x1, 16 * 1]
+    ldp x23, x24, [x1, 16 * 2]
+    ldp x25, x26, [x1, 16 * 3]
+    ldp x27, x28, [x1, 16 * 4]
+    ldp fp, lr, [x1, 16 * 5]
+    ldr x9, [x1, 16 * 6]        // next->sp = sp
+    mov sp,  x9
+    msr tpidr_el1, x1           // tpidr_el1 = (void*) next, update current thread
+    ret                         // jumpping to next->lr
+

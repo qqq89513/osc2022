@@ -7,6 +7,7 @@
 #include "cpio.h"
 #include "diy_malloc.h"
 #include "fdtb.h"
+#include "thread.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi5-baremetal-lab5$ "
@@ -28,6 +29,7 @@ void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr
 
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
+static void foo();
 extern uint64_t __image_start, __image_end;
 extern uint64_t __stack_start, __stack_end;
 void main(void *dtb_addr)
@@ -46,6 +48,13 @@ void main(void *dtb_addr)
   uart_printf("Welcome------------------------ lab 5\r\n");
 
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
+
+  thread_init();
+  for(int i=0; i<6; i++) {
+    thread_create(foo, KERNEL);
+  }
+  Rqueue_dump();
+  idle();
 
   while(1) {
 
@@ -176,3 +185,15 @@ void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr
     spsr_el1, elr_el1, esr_el1, cause);
 }
 
+static void foo(){
+  thread_t *thd = thread_get_current();
+  // lr == foo()
+  for(int i=0; i<4; ++i) {    
+    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
+      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
+    uint64_t tk;
+    WAIT_TICKS(tk, 100000000);
+    schedule();
+  }
+  // implicit jump to lr
+}

@@ -18,7 +18,9 @@
     "diy_printf.h": "c",
     "cstdint": "c",
     "sys_reg.h": "c",
-    "timer.h": "c"
+    "timer.h": "c",
+    "thread.h": "c",
+    "threads.h": "c"
   }
 
 }
