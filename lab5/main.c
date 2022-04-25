@@ -8,6 +8,8 @@
 #include "diy_malloc.h"
 #include "fdtb.h"
 #include "thread.h"
+#include "timer.h"
+#include "sys_reg.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi5-baremetal-lab5$ "
@@ -31,12 +33,14 @@ static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
 static void foo();
 static void shell();
+static void irq_handler();
 extern uint64_t __image_start, __image_end;
 extern uint64_t __stack_start, __stack_end;
 void main(void *dtb_addr)
 {
 
   sys_init(dtb_addr);
+  EL1_ARM_INTERRUPT_ENABLE();
 
   // say hello
   uart_printf("\r\n\r\n");
@@ -88,8 +92,57 @@ static void sys_init(void *dtb_addr){
 }
 
 void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause){
-  uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
-    spsr_el1, elr_el1, esr_el1, cause);
+  switch(cause){
+    
+    // synchornous (svc)
+    case 5:  case 9:
+      break;
+    
+    // IRQ
+    case 6:  case 10:
+      irq_handler();
+      schedule();
+      break;
+    
+    case  1: case  2: case  3: case  4:
+    case  7: case  8: case 11: case 12:
+    case 13: case 14: case 15: case 16:
+    default:
+      uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
+        spsr_el1, elr_el1, esr_el1, cause);
+      uart_printf("Above exception unhandled\r\n");
+  }
+}
+
+static void irq_handler(){
+  // Enter critical section
+  EL1_ARM_INTERRUPT_DISABLE();  // this doesn't work with uart_puts_async(), don't know why
+
+  // uart interrupt fired
+  if(*IRQS1_PENDING & AUX_INT){
+    uart_printf("Exception, uart interrtupt not enabled but fired\r\n");
+  }
+
+  // arm core 0 timer interrupt fired
+  else if(*CORE0_IRQ_SOURCE & COREx_IRQ_SOURCE_CNTPNSIRQ_MASK){
+    // only available in el1
+    // unsigned long cntpct = read_sysreg(cntpct_el0);
+	  unsigned long cntfrq = read_sysreg(cntfrq_el0);
+    // uart_printf("ticks=%ld, freq=%ld, time elapsed=%ldms\r\n", 
+    //   cntpct, cntfrq, (cntpct*1000) / cntfrq);
+    write_sysreg(cntp_tval_el0, cntfrq >> 5); // set next tick to 1/32 second, which is, time slice for round robin
+  }
+
+  // Unknown interrupt fired
+  else{
+    uart_printf("Unknown general interrupt fired, IRQS1_PENDING=0x%08X, CORE0_IRQ_SOURCE=0x%08X, in c_irq_el1h_ex_handler().\r\n",
+      *IRQS1_PENDING, *CORE0_IRQ_SOURCE);
+    uart_printf("Blocking in while(1) now...\r\n");
+    while(1);
+  }
+
+  // Exit critical section
+  EL1_ARM_INTERRUPT_ENABLE();  // this doesn't work with uart_puts_async(), don't know why
 }
 
 static void foo(){
@@ -99,8 +152,8 @@ static void foo(){
     uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
       thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
     uint64_t tk;
-    WAIT_TICKS(tk, 20000000);
-    schedule();
+    WAIT_TICKS(tk, 50000000);
+    // schedule(); // with timer enabled, thread doesn't need to call schedule(), exeception handler forced interrupted thread swap out
   }
   if(thd->pid == 3){
     kill(4);

@@ -2,6 +2,7 @@
 #include "diy_malloc.h"
 #include "sys_reg.h"
 #include "uart.h"
+#include "timer.h"
 
 #define DEFAULT_THREAD_SIZE 4096 // 4kB, this includes the size of a stack and the thread's TCB
 #define PID_KERNEL_MAIN 0
@@ -97,6 +98,7 @@ void idle(){
   thd_now = run_q_pop_head();      // make it as if current running thread is idle()
   thd_now->state = RUNNNING;
   write_sysreg(tpidr_el1, thd_now);
+  core_timer_state(1);
   while(1){
     // TODO: Kill exited (zombie)
     // TODO: Make shell here
