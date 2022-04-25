@@ -434,8 +434,8 @@ void mem_reserve(uint64_t start, uint64_t end){
 }
 
 // diy_malloc, diy_free for small memory ---------------------------
-void *diy_malloc(size_t desire_size){
-  // TODO: Handle allocation for desire_size > (PAGE_SIZE-sizeof(chunk_header))
+void *diy_malloc(size_t size){
+  // TODO: Handle allocation for size > (PAGE_SIZE-sizeof(chunk_header))
   // TODO: Handle the case that unused chunks available, but new page needs to be allocated
   //       Then the unused chunks is never reachable untill the page they belong to is freed.
   
@@ -463,7 +463,7 @@ void *diy_malloc(size_t desire_size){
   // Current page is freed in diy_free(), so allocate a new one
   if(malloc_page_usage[curr_page] == -1){
     curr_page = -1;
-    return diy_malloc(desire_size);
+    return diy_malloc(size);
   }
 
 
@@ -478,13 +478,13 @@ void *diy_malloc(size_t desire_size){
   // First fit: find the first fittable hole
   chunk_header *header = (chunk_header*) GET_PAGE_ADDR(curr_page); // header->size is the size of allocated block
   void *ret = NULL;
-  desire_size += sizeof(chunk_header);
+  size_t desire_size = size + sizeof(chunk_header);
   desire_size += (8-(desire_size % 8)); // round up to 8
 
   // Large request, allocate pages for the request
   if(desire_size >= PAGE_SIZE){
     // Calculate how many pages need to be allocate
-    const int pages = desire_size / PAGE_SIZE + ((desire_size%PAGE_SIZE) != 0);   // ceil(desire_size / PAGE_SIZE)
+    const int pages = size / PAGE_SIZE + ((size%PAGE_SIZE) != 0);   // ceil(size / PAGE_SIZE)
     // Allocate pages
     const int allocated_page = alloc_page(pages, 0);
     for(int i=allocated_page; i<allocated_page+pages; i++)
