@@ -10,39 +10,70 @@
 extern void switch_to(thread_t *curr, thread_t *next); // defined in start.S
 
 static int pid_count = PID_KERNEL_MAIN;        // 0 for main() from kernel, who has no parent thread
-static thread_t *queue_head = NULL;
-static thread_t *queue_tail = NULL;
-
-static void Rqueue_insert_tail(thread_t *thd){
-  if(thd == queue_tail){
-    uart_printf("Exception, in Rqueue_insert_tail(), thd == queue_tail, pid=%d\r\n", thd->pid);
+static thread_t *run_q_head = NULL;   // run queue, .state = WAIT_TO_RUN
+static thread_t *run_q_tail = NULL;
+static thread_t *exited_ll_head = NULL;   // exited linked list, .state = EXITED, waiting to be cleaned
+static void run_q_insert_tail(thread_t *thd){
+  if(thd == run_q_tail){
+    uart_printf("Exception, in run_q_insert_tail(), thd == run_q_tail, pid=%d\r\n", thd->pid);
     return;
   }
   // First thread in queue
-  if(queue_head == NULL && queue_tail == NULL){
-    queue_head = thd;
-    queue_tail = thd;
+  if(run_q_head == NULL && run_q_tail == NULL){
+    run_q_head = thd;
+    run_q_tail = thd;
   }
   // Insert thread in tail of queue
   else{
     thd->next = NULL;
-    queue_tail->next = thd;
-    queue_tail = thd; // update tail
+    run_q_tail->next = thd;
+    run_q_tail = thd; // update tail
   }
 }
-static thread_t *Rqueue_pop_head(){
+static thread_t *run_q_pop_head(){
   thread_t *thd_return = NULL;
 
-  if(queue_head == NULL){
+  if(run_q_head == NULL){
     thd_return = NULL;
   }
   else{
-    thd_return = queue_head;
-    queue_head = queue_head->next;
-    if(queue_head == NULL)
-      queue_tail = NULL;
+    thd_return = run_q_head;
+    run_q_head = run_q_head->next;
+    if(run_q_head == NULL)
+      run_q_tail = NULL;
   }
   return thd_return;  
+}
+static void exited_ll_insert_head(thread_t *thd){
+  if(exited_ll_head == NULL){
+    exited_ll_head = thd;
+    exited_ll_head->next = NULL;
+  }
+  else{
+    thd->next = exited_ll_head;
+    exited_ll_head = thd;
+  }
+}
+static void threads_dump(thread_t *head){
+  thread_t *thd = head;
+  while(thd != NULL){
+    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p\r\n",
+      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr);
+    thd = thd->next;
+  }
+}
+static void clean_exited(){
+  thread_t *thd = exited_ll_head;
+  thread_t *temp = exited_ll_head;
+  // clean all exited threads
+  while(thd != NULL){
+    temp = thd;
+    thd->state = CLEANED; // redundant, since the space will be freed
+    thd = thd->next;
+    uart_printf("cleaning pid %d\r\n", temp->pid);
+    diy_free(temp);
+  }
+  exited_ll_head = NULL; // exited list is now empty
 }
 
 void idle(){
@@ -54,21 +85,23 @@ void idle(){
     uart_printf("schedule() might be called before idle() is called. pid=%d\r\n", thd_now->pid);
     return;
   }
-  else if(queue_head == NULL){          // maybe thread_init() is not called
-    uart_printf("Exeception, in idle(), queue_head is NULL\r\n");
+  else if(run_q_head == NULL){          // maybe thread_init() is not called
+    uart_printf("Exeception, in idle(), run_q_head is NULL\r\n");
     return;
   }
-  else if(queue_head->pid != PID_IDLE){
-    uart_printf("Exeception, in idle(), queue_head->pid=%d, should be PID_IDLE=%d\r\n", queue_head->pid, PID_IDLE);
+  else if(run_q_head->pid != PID_IDLE){
+    uart_printf("Exeception, in idle(), run_q_head->pid=%d, should be PID_IDLE=%d\r\n", run_q_head->pid, PID_IDLE);
     return;
   }
   
-  thd_now = Rqueue_pop_head();      // make it as if current running thread is idle()
+  thd_now = run_q_pop_head();      // make it as if current running thread is idle()
+  thd_now->state = RUNNNING;
   write_sysreg(tpidr_el1, thd_now);
   while(1){
     // TODO: Kill exited (zombie)
     // TODO: Make shell here
     uart_printf("Entered idle\r\n");
+    clean_exited();
     schedule();
   }
 }
@@ -113,7 +146,7 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   if(thd_parent != NULL)   thd_new->ppid = 0;               // Thread created from other thread
   else                     thd_new->ppid = thd_parent->pid; // Thread created from main() from kernel
 
-  Rqueue_insert_tail(thd_new);
+  run_q_insert_tail(thd_new);
   pid_count++;
   return thd_new;
 }
@@ -121,7 +154,7 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
 void schedule(){
 
   thread_t *thd_now = thread_get_current();
-  thread_t *thd_next = Rqueue_pop_head();
+  thread_t *thd_next = run_q_pop_head();
 
   // Error check, early returns
   if(thd_next == NULL && thd_now->pid != 1){
@@ -129,8 +162,8 @@ void schedule(){
     return;
   }
   else if(thd_now == thd_next){
-    uart_printf("Exception, thd_now == thd_next, pid=%d. Rqueue_dump():\r\n", thd_now->pid);
-    Rqueue_dump();
+    uart_printf("Exception, thd_now == thd_next, pid=%d. r_q_dump():\r\n", thd_now->pid);
+    r_q_dump();
     return;
   }
 
@@ -139,15 +172,60 @@ void schedule(){
     return;
 
   // TODO: Check state to determine to insert thd_now back to queue or not
-  Rqueue_insert_tail(thd_now);
+  /*switch(thd_now->state){
+    case RUNNNING:
+      run_q_insert_tail(thd_now);
+      break;
+    case EXITED:
+    case WAIT_TO_RUN:
+    case CLEANED:
+  }*/
+  if(thd_now->state == RUNNNING){
+    run_q_insert_tail(thd_now); // current thread called exit()
+  }
+
+  thd_now->state = WAIT_TO_RUN;
+  thd_next->state = RUNNNING;
   switch_to(thd_now, thd_next);
 }
 
-void Rqueue_dump(){
-  thread_t *thd = queue_head;
+void r_q_dump(){
+  threads_dump(run_q_head);
+}
+void exited_ll_dump(){
+  threads_dump(exited_ll_head);
+}
+
+void exit(){
+  thread_t *thd = thread_get_current();
+  // current thread is not in run queue, so no need to remove it from run queue
+  thd->state = EXITED;
+  exited_ll_insert_head(thd);
+  schedule();
+}
+
+int kill(int pid){
+  thread_t *thd = run_q_head;
+  thread_t *prev = NULL;
   while(thd != NULL){
-    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p\r\n",
-      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr);
+    if(thd->pid == pid)
+      break;
+    prev = thd;
     thd = thd->next;
   }
+
+  if(thd == NULL){
+    uart_printf("Error, no pid %d found in run queue, failed to kill().\r\n", pid);
+    return -1;
+  }
+
+  thd->state = EXITED;
+  if(prev != NULL)
+    prev->next = thd->next;
+  else
+    run_q_head = thd->next;
+
+  exited_ll_insert_head(thd);
+
+  return 0;  
 }

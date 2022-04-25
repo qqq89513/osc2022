@@ -53,7 +53,7 @@ void main(void *dtb_addr)
   for(int i=0; i<6; i++) {
     thread_create(foo, KERNEL);
   }
-  Rqueue_dump();
+  r_q_dump();
   idle();
 
   while(1) {
@@ -192,8 +192,13 @@ static void foo(){
     uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
       thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
     uint64_t tk;
-    WAIT_TICKS(tk, 100000000);
+    WAIT_TICKS(tk, 50000000);
     schedule();
   }
-  // implicit jump to lr
+  if(thd->pid == 2){
+    kill(3);
+    kill(4);
+  }
+  uart_printf("pid %d exiting\r\n", thd->pid);  // killed thread will not be here
+  exit();
 }

@@ -47,7 +47,10 @@ void thread_init();
 thread_t *thread_get_current();
 thread_t *thread_create(void *func, enum task_exeception_level mode);
 void schedule();
-void Rqueue_dump();
+void r_q_dump();
+void exited_ll_dump();
+void exit();
+int kill(int pid);
 
 
 #ifdef __cplusplus
