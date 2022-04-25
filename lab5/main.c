@@ -27,7 +27,7 @@
 
 #define ADDR_IMAGE_START 0x80000
 
-void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause);
+void general_exception_handler(uint64_t cause, trap_frame *tf);
 
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
@@ -41,7 +41,10 @@ void main(void *dtb_addr)
 
   sys_init(dtb_addr);
   EL1_ARM_INTERRUPT_ENABLE();
-
+  asm volatile("mov x8, 1234");
+  asm volatile("mov x17, 5678");
+  asm volatile("svc 0");
+  while(1);
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 5\r\n");
@@ -91,11 +94,12 @@ static void sys_init(void *dtb_addr){
   alloc_page_init();
 }
 
-void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr_el1, uint64_t cause){
+void general_exception_handler(uint64_t cause, trap_frame *tf){
+  
   switch(cause){
-    
     // synchornous (svc)
     case 5:  case 9:
+      uart_printf("x8=%lu, x17=%lu\r\n", tf->x8, tf->x17);
       break;
     
     // IRQ
@@ -109,7 +113,7 @@ void general_exception_handler(uint64_t spsr_el1, uint64_t elr_el1, uint64_t esr
     case 13: case 14: case 15: case 16:
     default:
       uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
-        spsr_el1, elr_el1, esr_el1, cause);
+        tf->spsr_el1, tf->elr_el1, tf->esr_el1, cause);
       uart_printf("Above exception unhandled\r\n");
   }
 }
