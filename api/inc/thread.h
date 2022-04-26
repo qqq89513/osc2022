@@ -49,8 +49,8 @@ thread_t *thread_create(void *func, enum task_exeception_level mode);
 void schedule();
 void r_q_dump();
 void exited_ll_dump();
-void exit();
-int kill(int pid);
+void exit_call_by_syscall_only();
+int kill_call_by_syscall_only(int pid);
 
 
 #ifdef __cplusplus

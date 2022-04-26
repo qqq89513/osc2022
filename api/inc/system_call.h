@@ -16,9 +16,9 @@ size_t uart_read(char buf[], size_t size);
 size_t uart_write(const char buf[], size_t size);
 int    exec(const char *name, char *const argv[]);
 int    fork();
-void   exit_(int status);
+void   exit(int status);
 int    mbox_call_(unsigned char ch, unsigned int *mbox);
-void   kill_(int pid);
+int    kill(int pid);
 
 #ifdef __cplusplus
 }

@@ -197,7 +197,7 @@ void exited_ll_dump(){
   threads_dump(exited_ll_head);
 }
 
-void exit(){
+void exit_call_by_syscall_only(){
   thread_t *thd = thread_get_current();
   // current thread is not in run queue, so no need to remove it from run queue
   thd->state = EXITED;
@@ -205,7 +205,7 @@ void exit(){
   schedule();
 }
 
-int kill(int pid){
+int kill_call_by_syscall_only(int pid){
   thread_t *thd = run_q_head;
   thread_t *prev = NULL;
   while(thd != NULL){
@@ -216,7 +216,6 @@ int kill(int pid){
   }
 
   if(thd == NULL){
-    uart_printf("Error, no pid %d found in run queue, failed to kill().\r\n", pid);
     return -1;
   }
 
