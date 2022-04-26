@@ -29,8 +29,18 @@ volatile uint32_t  __attribute__((aligned(16))) mbox_buf[36];
  */
 int mbox_call(unsigned char ch)
 {
+  return mbox_call_user_buffer(ch, (unsigned int*)mbox_buf);
+}
+/**
+ * @param ch: 0~8, 8 for property
+ * @param mbox: a pointer to the buffer from user space. 
+ *              caller should fill it as documented. 
+ *              If the there is an output from mail box, the output is also placed somewhere in the buffer
+ * @return 0 on failure, non-zero on success
+*/
+int mbox_call_user_buffer(unsigned char ch, unsigned int *mbox){
   uint32_t temp = (
-    (    ((uint32_t) ((uint64_t)mbox_buf)) & ~0xF    ) // & ~0xF clears lower 4 bits
+    (    ((uint32_t) ((uint64_t)mbox)) & ~0xF    ) // & ~0xF clears lower 4 bits
      | 
     ( ch & 0xF ) // & 0x0000000F clears upper 28 bits
   ); // 28 bits(MSB) for value, 4 bits for the channel
@@ -47,7 +57,7 @@ int mbox_call(unsigned char ch)
   // Check if the value is the same as the one wrote into MBOX_WRITE
   if(*MBOX_READ == temp)
     /* is it a valid successful response? */
-    return mbox_buf[1] == MBOX_RESPONSE;
+    return mbox[1] == MBOX_RESPONSE;
   else
     return 0;
 }

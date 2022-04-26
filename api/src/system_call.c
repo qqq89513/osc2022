@@ -2,6 +2,7 @@
 #include "system_call.h"
 #include "sys_reg.h"
 #include "thread.h"
+#include "mbox.h"
 #include "uart.h"
 
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
@@ -86,17 +87,37 @@ static int    priv_getpid(){
 }
 
 size_t        sysc_uart_read(char buf[], size_t size){
-  return 0;
+  write_gen_reg(x8, SYSCALL_NUM_UART_READ);
+  write_gen_reg(x1, size);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, buf);   // so write to x0 should be the last one performed, maybe should change to register int var asm("x0");
+  asm volatile("svc 0");
+  size_t ret_val = read_gen_reg(x0);
+  return ret_val;
 }
 static size_t priv_uart_read(char buf[], size_t size){
-  return 0;
+  const size_t s = size;
+  while(size != 0){
+    *buf++ = (char)uart_read_byte();
+    size--;
+  }
+  return s;
 }
 
 size_t        sysc_uart_write(const char buf[], size_t size){
-  return 0;
+  write_gen_reg(x8, SYSCALL_NUM_UART_WRITE);
+  write_gen_reg(x1, size);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, buf);   // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  size_t ret_val = read_gen_reg(x0);
+  return ret_val;
 }
 static size_t priv_uart_write(const char buf[], size_t size){
-  return 0;
+  const size_t s = size;
+  while(size != 0){
+    uart_send(*buf++);
+    size--;
+  }
+  return s;
 }
 
 int           sysc_exec(const char *name, char *const argv[]){
@@ -125,10 +146,15 @@ static void   priv_exit(int status){
 }
 
 int           sysc_mbox_call(unsigned char ch, unsigned int *mbox){
-  return 0;
+  write_gen_reg(x8, SYSCALL_NUM_MBOX_CALL);
+  write_gen_reg(x1, mbox);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, ch);    // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
 }
 static int    priv_mbox_call(unsigned char ch, unsigned int *mbox){
-  return 0;
+  return mbox_call_user_buffer(ch, mbox);
 }
 
 int           sysc_kill(int pid){

@@ -23,4 +23,6 @@
 int mbox_board_rev(uint32_t *board_reviion);
 int mbox_arm_mem_info(uint32_t **base_addr, uint32_t *size);
 
+int mbox_call_user_buffer(unsigned char ch, unsigned int *mbox);
+
 #endif /* __MBOX_H */
