@@ -10,6 +10,7 @@
 #include "thread.h"
 #include "timer.h"
 #include "sys_reg.h"
+#include "system_call.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi5-baremetal-lab5$ "
@@ -41,10 +42,7 @@ void main(void *dtb_addr)
 
   sys_init(dtb_addr);
   EL1_ARM_INTERRUPT_ENABLE();
-  asm volatile("mov x8, 1234");
-  asm volatile("mov x17, 5678");
-  asm volatile("svc 0");
-  while(1);
+
   // say hello
   uart_printf("\r\n\r\n");
   uart_printf("Welcome------------------------ lab 5\r\n");
@@ -99,7 +97,7 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
   switch(cause){
     // synchornous (svc)
     case 5:  case 9:
-      uart_printf("x8=%lu, x17=%lu\r\n", tf->x8, tf->x17);
+      system_call(tf);
       break;
     
     // IRQ
@@ -150,20 +148,19 @@ static void irq_handler(){
 }
 
 static void foo(){
-  thread_t *thd = thread_get_current();
+  int pid = getpid();
   // lr == foo()
-  for(int i=0; i<4; ++i) {    
-    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p, i=%d,  --------------\r\n",
-      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr, i);
+  for(int i=0; i<5; ++i) {    
+    uart_printf("pid = %d, i=%d\r\n", pid, i);
     uint64_t tk;
     WAIT_TICKS(tk, 50000000);
     // schedule(); // with timer enabled, thread doesn't need to call schedule(), exeception handler forced interrupted thread swap out
   }
-  if(thd->pid == 3){
+  if(pid == 3){
     kill(4);
     kill(5);
   }
-  uart_printf("pid %d exiting\r\n", thd->pid);  // killed thread will not be here
+  uart_printf("pid %d exiting\r\n", pid);  // killed thread will not be here
   exit();
 }
 

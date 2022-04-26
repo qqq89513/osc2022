@@ -6,6 +6,7 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
 
 #define read_sysreg(r) ({                           \
     unsigned long __val;                            \
