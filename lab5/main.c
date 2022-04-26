@@ -148,7 +148,7 @@ static void irq_handler(){
 }
 
 static void foo(){
-  int pid = getpid();
+  int pid = sysc_getpid();
   // lr == foo()
   for(int i=0; i<5; ++i) {    
     uart_printf("pid = %d, i=%d\r\n", pid, i);
@@ -157,15 +157,15 @@ static void foo(){
     // schedule(); // with timer enabled, thread doesn't need to call schedule(), exeception handler forced interrupted thread swap out
   }
 
-  // Test of kill(): thread 3 kills thread 4 and 5
+  // Test of sysc_kill(): thread 3 kills thread 4 and 5
   if(pid == 3){
     // if timer is enabled, than the order of threading might not be deterministic,
-    // so thread 4 or 5 might exited before thread 3, resulting in failing og kill(4) or kill(5)
-    if(kill(4) != 0)  uart_printf("Error, no pid %d found in run queue, failed to kill().\r\n", 4);
-    if(kill(5) != 0)  uart_printf("Error, no pid %d found in run queue, failed to kill().\r\n", 5);
+    // so thread 4 or 5 might exited before thread 3, resulting in failing og sysc_kill(4) or sysc_kill(5)
+    if(sysc_kill(4) != 0)  uart_printf("Error, no pid %d found in run queue, failed to sysc_kill().\r\n", 4);
+    if(sysc_kill(5) != 0)  uart_printf("Error, no pid %d found in run queue, failed to sysc_kill().\r\n", 5);
   }
   uart_printf("pid %d exiting\r\n", pid);  // killed thread will not reach here
-  exit(0);
+  sysc_exit(0);
 }
 
 static void shell(){

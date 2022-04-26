@@ -172,17 +172,8 @@ void schedule(){
   if(thd_next == NULL && thd_now->pid == 1)
     return;
 
-  // TODO: Check state to determine to insert thd_now back to queue or not
-  /*switch(thd_now->state){
-    case RUNNNING:
-      run_q_insert_tail(thd_now);
-      break;
-    case EXITED:
-    case WAIT_TO_RUN:
-    case CLEANED:
-  }*/
   if(thd_now->state == RUNNNING){
-    run_q_insert_tail(thd_now); // current thread called exit()
+    run_q_insert_tail(thd_now);
   }
 
   thd_now->state = WAIT_TO_RUN;

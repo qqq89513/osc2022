@@ -11,14 +11,14 @@ extern "C" {
 
 void system_call(trap_frame *tf);
 
-int    getpid();
-size_t uart_read(char buf[], size_t size);
-size_t uart_write(const char buf[], size_t size);
-int    exec(const char *name, char *const argv[]);
-int    fork();
-void   exit(int status);
-int    mbox_call_(unsigned char ch, unsigned int *mbox);
-int    kill(int pid);
+int    sysc_getpid();
+size_t sysc_uart_read(char buf[], size_t size);
+size_t sysc_uart_write(const char buf[], size_t size);
+int    sysc_exec(const char *name, char *const argv[]);
+int    sysc_fork();
+void   sysc_exit(int status);
+int    sysc_mbox_call(unsigned char ch, unsigned int *mbox);
+int    sysc_kill(int pid);
 
 #ifdef __cplusplus
 }
