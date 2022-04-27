@@ -46,6 +46,7 @@ void idle();
 void thread_init();
 thread_t *thread_get_current();
 thread_t *thread_create(void *func, enum task_exeception_level mode);
+void start_scheduling();
 void schedule();
 void r_q_dump();
 void exited_ll_dump();

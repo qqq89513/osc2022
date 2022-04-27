@@ -55,8 +55,7 @@ void main(void *dtb_addr)
     thread_create(foo, KERNEL);
   }
   r_q_dump();
-  idle();
-
+  start_scheduling();
 }
 
 static int spilt_strings(char** str_arr, char* str, char* deli){
@@ -150,7 +149,7 @@ static void irq_handler(){
 static void foo(){
   int pid = sysc_getpid();
   // lr == foo()
-  for(int i=0; i<5; ++i) {    
+  for(int i=0; i<10; ++i) {    
     uart_printf("pid = %d, i=%d\r\n", pid, i);
     uint64_t tk;
     WAIT_TICKS(tk, 50000000);

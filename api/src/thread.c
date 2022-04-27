@@ -8,6 +8,8 @@
 #define PID_KERNEL_MAIN 0
 #define PID_IDLE        1
 
+extern void switch_to(thread_t *curr, thread_t *next);  // defined in start.S
+extern void go_to_thread(thread_t *next);               // defined in start.S
 
 static int pid_count = PID_KERNEL_MAIN;        // 0 for main() from kernel, who has no parent thread
 static thread_t *run_q_head = NULL;   // run queue, .state = WAIT_TO_RUN
@@ -75,61 +77,39 @@ static void clean_exited(){
   }
   exited_ll_head = NULL; // exited list is now empty
 }
-static void switch_to(thread_t *curr, thread_t *next){
-  /** Context switch from curr thread to next thread. 
-   * Save curr context to curr's own stack, update the sp to next's, and than jump to next->lr.
-   * Since this is a function call, x0~x15 is saved (should be saved) by caller
-   * This function is only available in el1. Invoking in el0 raises synchornous exeception.
-   * void switch_to(thread_t *curr, thread_t *next);
-   * @param curr (x0): 
-   * @param next (x1): 
-  */ 
-  asm volatile("stp x19, x20, [x0, 16 * 0]");  // curr->x19=x19, curr->x20=x20
-  asm volatile("stp x21, x22, [x0, 16 * 1]");
-  asm volatile("stp x23, x24, [x0, 16 * 2]");
-  asm volatile("stp x25, x26, [x0, 16 * 3]");
-  asm volatile("stp x27, x28, [x0, 16 * 4]");
-  asm volatile("stp fp,  lr,  [x0, 16 * 5]");
-  asm volatile("mov x9,  sp");                 // x9 is corruptible register, caller saved
-  asm volatile("str x9,       [x0, 16 * 6]");  // curr->sp = sp
-  asm volatile("ldp x19, x20, [x1, 16 * 0]");  // next->x19=x19, next->x20=x20
-  asm volatile("ldp x21, x22, [x1, 16 * 1]");
-  asm volatile("ldp x23, x24, [x1, 16 * 2]");
-  asm volatile("ldp x25, x26, [x1, 16 * 3]");
-  asm volatile("ldp x27, x28, [x1, 16 * 4]");
-  asm volatile("ldp fp,  lr,  [x1, 16 * 5]");
-  asm volatile("ldr x9,       [x1, 16 * 6]");  // next->sp = sp
-  asm volatile("mov sp,  x9");
-  asm volatile("msr tpidr_el1, x1");           // tpidr_el1 = (void*) next, update current thread
-  // Implicit asm volatile("ret");             // jumpping to next->lr
-}
 
-
-void idle(){
-  thread_t *thd_now = NULL;
+void start_scheduling(){
+  thread_t *thd = run_q_pop_head();
+  
   // Error check, early returns
-  thd_now = thread_get_current();
-  if(thd_now != NULL){                  // idle() should be only called from kernel main
-    uart_printf("Exeception, in idle(), idle() is not invoked from kernel main, ");
-    uart_printf("schedule() might be called before idle() is called. pid=%d\r\n", thd_now->pid);
+  if(thd == NULL){
+    uart_printf("Exeception, in start_scheduling(), run_q_head is NULL. Maybe thread_init() is not called?\r\n");
     return;
   }
-  else if(run_q_head == NULL){          // maybe thread_init() is not called
-    uart_printf("Exeception, in idle(), run_q_head is NULL\r\n");
+  else if(thd->pid != PID_IDLE){
+    uart_printf("Exeception, in start_scheduling(), run_q_head->pid=%d, should be PID_IDLE=%d.\r\n", run_q_head->pid, PID_IDLE);
     return;
   }
-  else if(run_q_head->pid != PID_IDLE){
-    uart_printf("Exeception, in idle(), run_q_head->pid=%d, should be PID_IDLE=%d\r\n", run_q_head->pid, PID_IDLE);
+  else if(thd->target_func != (void*) idle){
+    uart_printf("Exeception, in start_scheduling(), run_q_head->target_func != idle. Maybe thread_create() is called before thread_init()\r\n");
     return;
   }
   
-  thd_now = run_q_pop_head();      // make it as if current running thread is idle()
-  thd_now->state = RUNNNING;
-  write_sysreg(tpidr_el1, thd_now);
+  // Make it as if current running thread is idle()
+  thd->state = RUNNNING;
+
+  // Set first timer to 0.5 sec and enable it
+  unsigned long cntfrq = read_sysreg(cntfrq_el0);
+  write_sysreg(cntp_tval_el0, cntfrq >> 1);
   core_timer_state(1);
+
+  // Jumps to idle(), never return
+  go_to_thread(thd);
+  uart_printf("Exception, in start_scheduling(), should not get here\r\n");
+}
+
+void idle(){
   while(1){
-    // TODO: Kill exited (zombie)
-    // TODO: Make shell here
     clean_exited();
     schedule();
   }
