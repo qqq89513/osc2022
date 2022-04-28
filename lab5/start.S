@@ -119,7 +119,7 @@ from_el1_to_el0:
  */ 
 from_el1_to_el0_remote:
     // set spsr_el1 to 0x3c0
-    mov x3,        0x3c0        // EL0t, interrupt disabled
+    mov x3,        0x000        // EL0t, interrupt disabled
     msr spsr_el1,  x3
     // set elr_el1 to the user program’s address
     msr elr_el1,   x1           // return address to the caller
@@ -144,14 +144,27 @@ switch_to:
   stp fp,  lr,  [x0, 16 * 5]
   mov x9,  sp                 // x9 is corruptible register, caller saved
   str x9,       [x0, 16 * 6]  // curr->sp = sp
-  ldp x19, x20, [x1, 16 * 0]  // next->x19=x19, next->x20=x20
+  mrs x9,       spsr_el1
+  str x9,       [x0, 16 * 6 + 8]
+  mrs x9,       elr_el1
+  str x9,       [x0, 16 * 7]
+  mrs x9,       esr_el1
+  str x9,       [x0, 16 * 7 + 8]
+
+  ldp x19, x20, [x1, 16 * 0]  // x19=next->x19=, x20=next->x20
   ldp x21, x22, [x1, 16 * 1]
   ldp x23, x24, [x1, 16 * 2]
   ldp x25, x26, [x1, 16 * 3]
   ldp x27, x28, [x1, 16 * 4]
   ldp fp,  lr,  [x1, 16 * 5]
-  ldr x9,       [x1, 16 * 6]  // next->sp = sp
+  ldr x9,       [x1, 16 * 6]  // sp = next->sp
   mov sp,  x9
+  ldr x9,       [x1, 16 * 6 + 8]
+  msr spsr_el1, x9
+  ldr x9,       [x1, 16 * 7]
+  msr elr_el1,  x9
+  ldr x9,       [x1, 16 * 7 + 8]
+  msr esr_el1,    x9
   msr tpidr_el1, x1           // tpidr_el1 = (void*) next, update current thread
   ret
 

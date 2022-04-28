@@ -25,6 +25,7 @@
 #define CMD_MALLOC        "m"
 #define CMD_FREE          "f"
 #define CMD_DUMP_PAGE     "dump_page"
+#define CMD_DUMP_RQ       "dump_rq"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -52,7 +53,7 @@ void main(void *dtb_addr)
   thread_init();
   thread_create(shell, KERNEL);
   for(int i=0; i<6; i++) {
-    thread_create(foo, KERNEL);
+    thread_create(foo, USER);
   }
   r_q_dump();
   start_scheduling();
@@ -92,7 +93,8 @@ static void sys_init(void *dtb_addr){
 }
 
 void general_exception_handler(uint64_t cause, trap_frame *tf){
-  
+  // thread_t *thd = thread_get_current();
+  // uart_printf("In exception handler, pid=%d, cause=%lu, elr_el1=0x%lX\r\n", thd->pid, cause, tf->elr_el1);
   switch(cause){
     // synchornous (svc)
     case 5:  case 9:
@@ -257,6 +259,10 @@ static void shell(){
         }
         else
           uart_printf("Usage: " CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
+      }
+      else if(strcmp_(args[0], CMD_DUMP_RQ) == 0){
+        uart_printf("Shell dump run queue:\r\n");
+        r_q_dump();
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);

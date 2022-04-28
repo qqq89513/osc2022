@@ -20,11 +20,13 @@
 
   // For nested interrupt, i.e. exeception triggered during handling exeception
   mrs x0,  spsr_el1
-  str x0,  [sp, 16 * 16]
+  str x0,  [sp, 16 * 15 + 8]
   mrs x0,  elr_el1
-  str x0,  [sp, 16 * 17]
+  str x0,  [sp, 16 * 16]
   mrs x0,  esr_el1
-  str x0,  [sp, 16 * 18]
+  str x0,  [sp, 16 * 16 + 8]
+  mrs x0,  sp_el0             // sp_el0 also needs to be saved cuz eret makes "mov sp, sp_el0"
+  str x0,  [sp, 16 * 17]
 .endm
 
 // load general registers from stack
@@ -47,12 +49,14 @@
   ldr x30, [sp, 16 * 15]
 
   // For nested interrupt, i.e. exeception triggered during handling exeception
-  ldr x0,         [sp, 16 * 16]
+  ldr x0,         [sp, 16 * 15 + 8]
   msr spsr_el1,   x0
-  ldr x0,         [sp, 16 * 17]
+  ldr x0,         [sp, 16 * 16]
   msr elr_el1,    x0
-  ldr x0,         [sp, 16 * 18]
+  ldr x0,         [sp, 16 * 16 + 8]
   msr esr_el1,    x0
+  ldr x0,         [sp, 16 * 17]
+  msr sp_el0,     x0
 
   // Restore x0
   ldp x0, x1, [sp ,16 * 0]

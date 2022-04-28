@@ -8,8 +8,10 @@
 #define PID_KERNEL_MAIN 0
 #define PID_IDLE        1
 
-extern void switch_to(thread_t *curr, thread_t *next);  // defined in start.S
-extern void go_to_thread(thread_t *next);               // defined in start.S
+// defined in start.S
+extern void switch_to(thread_t *curr, thread_t *next);
+extern void go_to_thread(thread_t *next);
+extern void from_el1_to_el0_remote(uint64_t args, uint64_t addr, uint64_t u_sp);
 
 static int pid_count = PID_KERNEL_MAIN;        // 0 for main() from kernel, who has no parent thread
 static thread_t *run_q_head = NULL;   // run queue, .state = WAIT_TO_RUN
@@ -58,9 +60,11 @@ static void exited_ll_insert_head(thread_t *thd){
 }
 static void threads_dump(thread_t *head){
   thread_t *thd = head;
+  const uint64_t stack_grows = thd->sp - (uint64_t)thd->allocated_addr;
   while(thd != NULL){
-    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%p, allocated_addr=%p\r\n",
-      thd->ppid, thd->pid, thd->state, thd->mode, thd->target_func, thd->allocated_addr);
+    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%lX, allocated_addr=%lX, .stack_gorws=%lX, .elr_el1=%lX\r\n",
+      thd->ppid, thd->pid, thd->state, thd->mode, (uint64_t)thd->target_func, 
+      (uint64_t)thd->allocated_addr, stack_grows, thd->elr_el1);
     thd = thd->next;
   }
 }
@@ -76,6 +80,13 @@ static void clean_exited(){
     diy_free(temp);
   }
   exited_ll_head = NULL; // exited list is now empty
+}
+static void thread_go_to_el0(){
+  thread_t *thd = thread_get_current();
+  
+  uart_printf("pid %d going to el0 now\r\n", thd->pid);
+  from_el1_to_el0_remote(0, (uint64_t)thd->target_func, thd->sp);
+  uart_printf("Exeception, in thread_go_to_el0(), should not get here.\r\n");
 }
 
 void start_scheduling(){
@@ -146,7 +157,11 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   
   thd_new->fp = (uint64_t) stack_start;
   thd_new->sp = (uint64_t) stack_start;
-  thd_new->lr = (uint64_t) func;  // jump to address stored in lr whenever this task
+  // Jump to func directly or go to el0 first
+  if(mode == KERNEL)
+    thd_new->lr = (uint64_t) func;  // jump to address stored in lr whenever this task
+  else
+   thd_new->lr = (uint64_t) thread_go_to_el0;
   thd_new->allocated_addr = space_addr;
   thd_new->target_func = func;
   thd_new->mode = mode;

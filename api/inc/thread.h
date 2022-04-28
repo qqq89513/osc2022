@@ -32,13 +32,15 @@ typedef struct thread_t {
   uint64_t fp;  // x29    // keep by switch_to()
   uint64_t lr;  // x30    // keep by switch_to()
   uint64_t sp;            // keep by switch_to()
+  uint64_t spsr_el1;      // for debug purpose, probally works without it
+  uint64_t elr_el1;       // for debug purpose, probally works without it
+  uint64_t esr_el1;       // for debug purpose, probally works without it
   void *allocated_addr;   // the address returned from diy_malloc(), passed to diy_free()
   int ppid;               // parent pid
   int pid;
   enum task_state state;
   enum task_exeception_level mode;
   void *target_func;
-  // doubly linked list
   struct thread_t *next;
 } thread_t;
 

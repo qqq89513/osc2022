@@ -45,11 +45,10 @@ typedef struct trap_frame {
   uint64_t x24; uint64_t x25;
   uint64_t x26; uint64_t x27;
   uint64_t x28; uint64_t x29;
-  uint64_t x30; uint64_t pad1;
-  
-  uint64_t spsr_el1; uint64_t pad2;
-  uint64_t elr_el1;  uint64_t pad3;
-  uint64_t esr_el1;  uint64_t pad4;
+  uint64_t x30; uint64_t spsr_el1;
+  uint64_t elr_el1;  uint64_t esr_el1;
+  uint64_t sp_el0;   uint64_t padding0;
+  uint64_t padding1; uint64_t padding2;
 } trap_frame;
 
 
