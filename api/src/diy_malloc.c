@@ -44,7 +44,9 @@ static buddy_status *the_frame_array;        // Has (heap_size/PAGE_SIZE) elemen
 static size_t total_pages = 0;      // = heal_size / PAGE_SIZE
 static uint64_t heap_start_addr = 0;// start address of heap
 
+#define MALLOC_WHOLE_PAGE (PAGE_SIZE + 1)
 static int *malloc_page_usage;      // used for malloc, malloc_page_usage[i] == k means that k bytes in page #i are allocated through malloc
+                                    // malloc_page_usage[i] == MALLOC_WHOLE_PAGE means that the page #i is allocated as single or multiple page for large diy_malloc() request
 
 // frame_freelist_arr[i] points to the head of the linked list of free 4kB*(2^i) pages
 buddynode *frame_freelist_arr[MAX_CONTI_ALLOCATION_EXPO + 1] = {NULL};
@@ -95,11 +97,16 @@ static void dump_chunk(){
   for(int i=0; i<total_pages; i++){
     header = (chunk_header*) GET_PAGE_ADDR(i); // header->size is the size of allocated block
     if(malloc_page_usage[i] >= 0){
-      uart_printf("Page %d, usage = %d bytes\r\n", i, malloc_page_usage[i]);
-      // Traverse all chunks in page #i
-      while((uint64_t)header < GET_PAGE_ADDR(i+1)){ // limit at current page
-        uart_printf("\tusable addr=%p, used=%d, size=%lu\r\n", &header[1], header->used, (uint64_t)header->size);
-        header = (chunk_header*) ( (uint64_t)header + header->size );
+      if(malloc_page_usage[i] == MALLOC_WHOLE_PAGE){
+        uart_printf("Page %d, entire page allocated at once.\r\n", i);
+      }
+      else{
+        uart_printf("Page %d, usage = %d bytes\r\n", i, malloc_page_usage[i]);
+        // Traverse all chunks in page #i
+        while((uint64_t)header < GET_PAGE_ADDR(i+1)){ // limit at current page
+          uart_printf("\tusable addr=%p, used=%d, size=%lu\r\n", &header[1], header->used, (uint64_t)header->size);
+          header = (chunk_header*) ( (uint64_t)header + header->size );
+        }
       }
     }
   }
@@ -488,7 +495,7 @@ void *diy_malloc(size_t size){
     // Allocate pages
     const int allocated_page = alloc_page(pages, 0);
     for(int i=allocated_page; i<allocated_page+pages; i++)
-      malloc_page_usage[i] = PAGE_SIZE;
+      malloc_page_usage[i] = MALLOC_WHOLE_PAGE;
 
     return (void*) GET_PAGE_ADDR(allocated_page);
   }
