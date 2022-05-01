@@ -144,12 +144,12 @@ switch_to:
   stp fp,  lr,  [x0, 16 * 5]
   mov x9,  sp                 // x9 is corruptible register, caller saved
   str x9,       [x0, 16 * 6]  // curr->sp = sp
-  mrs x9,       spsr_el1
-  str x9,       [x0, 16 * 6 + 8]
-  mrs x9,       elr_el1
-  str x9,       [x0, 16 * 7]
-  mrs x9,       esr_el1
-  str x9,       [x0, 16 * 7 + 8]
+  mrs x9,       spsr_el1            // for debug purpose
+  str x9,       [x0, 16 * 6 + 8]    // for debug purpose
+  mrs x9,       elr_el1             // for debug purpose
+  str x9,       [x0, 16 * 7]        // for debug purpose
+  mrs x9,       esr_el1             // for debug purpose
+  str x9,       [x0, 16 * 7 + 8]    // for debug purpose
 
   ldp x19, x20, [x1, 16 * 0]  // x19=next->x19=, x20=next->x20
   ldp x21, x22, [x1, 16 * 1]
@@ -159,11 +159,11 @@ switch_to:
   ldp fp,  lr,  [x1, 16 * 5]
   ldr x9,       [x1, 16 * 6]  // sp = next->sp
   mov sp,  x9
-  ldr x9,       [x1, 16 * 6 + 8]
-  msr spsr_el1, x9
-  ldr x9,       [x1, 16 * 7]
-  msr elr_el1,  x9
-  ldr x9,       [x1, 16 * 7 + 8]
+  ldr x9,       [x1, 16 * 6 + 8]    // for debug purpose
+  msr spsr_el1, x9                  // for debug purpose
+  ldr x9,       [x1, 16 * 7]        // for debug purpose
+  msr elr_el1,  x9                  // for debug purpose
+  ldr x9,       [x1, 16 * 7 + 8]    // for debug purpose
   msr esr_el1,    x9
   msr tpidr_el1, x1           // tpidr_el1 = (void*) next, update current thread
   ret

@@ -60,7 +60,7 @@ static void exited_ll_insert_head(thread_t *thd){
 }
 static void threads_dump(thread_t *head){
   thread_t *thd = head;
-  const uint64_t stack_grows = thd->sp - (uint64_t)thd->allocated_addr;
+  const uint64_t stack_grows = (uint64_t)thd->allocated_addr + DEFAULT_THREAD_SIZE - thd->sp;
   while(thd != NULL){
     uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%lX, allocated_addr=%lX, .stack_gorws=%lX, .elr_el1=%lX\r\n",
       thd->ppid, thd->pid, thd->state, thd->mode, (uint64_t)thd->target_func, 
