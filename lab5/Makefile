@@ -54,7 +54,7 @@ clean:
 	rm debug/ -rf
 
 run:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/kernel8.img
+	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/kernel8.img --accel tcg,thread=single
 
 gdb:
 	aarch64-none-elf-gdb.exe --eval-command="target remote:1234" ./debug/kernel8.elf

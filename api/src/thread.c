@@ -75,8 +75,14 @@ static void clean_exited(){
   while(thd != NULL){
     temp = thd;
     thd->state = CLEANED; // redundant, since the space will be freed
-    thd = thd->next;
     uart_printf("cleaning pid %d\r\n", temp->pid);
+    if(thd->mode == USER){
+      if(thd->user_space != NULL)
+        diy_free(thd->user_space);
+      else
+        uart_printf("Exception, in clean_exited(), thd.mode=USER but thd.user_space=NULL\r\n");
+    }
+    thd = thd->next;
     diy_free(temp);
   }
   exited_ll_head = NULL; // exited list is now empty
@@ -85,7 +91,7 @@ static void thread_go_to_el0(){
   thread_t *thd = thread_get_current();
   
   uart_printf("pid %d going to el0 now\r\n", thd->pid);
-  from_el1_to_el0_remote(0, (uint64_t)thd->target_func, thd->sp);
+  from_el1_to_el0_remote(0, (uint64_t)thd->target_func, (uint64_t)thd->user_sp);
   uart_printf("Exeception, in thread_go_to_el0(), should not get here.\r\n");
 }
 
@@ -158,10 +164,18 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   thd_new->fp = (uint64_t) stack_start;
   thd_new->sp = (uint64_t) stack_start;
   // Jump to func directly or go to el0 first
-  if(mode == KERNEL)
+  if(mode == KERNEL){
     thd_new->lr = (uint64_t) func;  // jump to address stored in lr whenever this task
-  else
-   thd_new->lr = (uint64_t) thread_go_to_el0;
+    thd_new->user_space = 0;        // unsued
+    thd_new->user_sp = 0;           // unsued
+  }
+  else{
+    void *user_space = diy_malloc(DEFAULT_THREAD_SIZE);
+    thd_new->lr = (uint64_t) thread_go_to_el0;
+    thd_new->user_space = user_space;
+    thd_new->user_sp = user_space + DEFAULT_THREAD_SIZE - 1;
+    thd_new->user_sp = (void*)(  (uint64_t)thd_new->user_sp - ((uint64_t)thd_new->user_sp % 16)  ); // round down to multiple of 16
+  }
   thd_new->allocated_addr = space_addr;
   thd_new->target_func = func;
   thd_new->mode = mode;
@@ -216,7 +230,7 @@ void exit_call_by_syscall_only(){
   // current thread is not in run queue, so no need to remove it from run queue
   thd->state = EXITED;
   exited_ll_insert_head(thd);
-  schedule();
+  // schedule(); // is called by system_call(), which is called by general_exception_handler(). And in general_exception_handler(), schedule is called after system_call().
 }
 
 int kill_call_by_syscall_only(int pid){

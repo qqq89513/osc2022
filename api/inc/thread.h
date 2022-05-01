@@ -36,6 +36,8 @@ typedef struct thread_t {
   uint64_t elr_el1;       // for debug purpose, probally works without it
   uint64_t esr_el1;       // for debug purpose, probally works without it
   void *allocated_addr;   // the address returned from diy_malloc(), passed to diy_free()
+  void *user_sp;          // for .state=USER
+  void *user_space;       // for .state=USER
   int ppid;               // parent pid
   int pid;
   enum task_state state;

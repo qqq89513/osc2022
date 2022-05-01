@@ -36,6 +36,7 @@ static int spilt_strings(char** str_arr, char* str, char* deli);
 static void foo();
 static void shell();
 static void irq_handler();
+static void mailbox_test();
 extern uint64_t __image_start, __image_end;
 extern uint64_t __stack_start, __stack_end;
 void main(void *dtb_addr)
@@ -93,6 +94,9 @@ static void sys_init(void *dtb_addr){
 }
 
 void general_exception_handler(uint64_t cause, trap_frame *tf){
+  // Enter critical section
+  EL1_ARM_INTERRUPT_DISABLE();
+
   // thread_t *thd = thread_get_current();
   // uart_printf("In exception handler, pid=%d, cause=%lu, elr_el1=0x%lX\r\n", thd->pid, cause, tf->elr_el1);
   switch(cause){
@@ -104,7 +108,6 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
     // IRQ
     case 6:  case 10:
       irq_handler();
-      schedule();
       break;
     
     case  1: case  2: case  3: case  4:
@@ -115,12 +118,13 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
         tf->spsr_el1, tf->elr_el1, tf->esr_el1, cause);
       uart_printf("Above exception unhandled\r\n");
   }
+
+  // Exit critical section
+  EL1_ARM_INTERRUPT_ENABLE();
+  schedule();
 }
 
 static void irq_handler(){
-  // Enter critical section
-  EL1_ARM_INTERRUPT_DISABLE();  // this doesn't work with uart_puts_async(), don't know why
-
   // uart interrupt fired
   if(*IRQS1_PENDING & AUX_INT){
     uart_printf("Exception, uart interrtupt not enabled but fired\r\n");
@@ -143,13 +147,11 @@ static void irq_handler(){
     uart_printf("Blocking in while(1) now...\r\n");
     while(1);
   }
-
-  // Exit critical section
-  EL1_ARM_INTERRUPT_ENABLE();  // this doesn't work with uart_puts_async(), don't know why
 }
-
 static void foo(){
   int pid = sysc_getpid();
+  if(pid == 7)
+    mailbox_test();
   // lr == foo()
   for(int i=0; i<10; ++i) {    
     uart_printf("pid = %d, i=%d\r\n", pid, i);
@@ -167,6 +169,36 @@ static void foo(){
   }
   uart_printf("pid %d exiting\r\n", pid);  // killed thread will not reach here
   sysc_exit(0);
+}
+
+static void mailbox_test(){
+  static volatile uint32_t  __attribute__((aligned(16))) mbox_buf[36];
+  uint32_t *mem_start_addr = 0;
+  uint32_t mem_size = 0;
+  int ret = 0;
+  int pid = sysc_getpid();
+  uart_printf("pid = %d, entering mailbox test\r\n", pid);
+
+  mbox_buf[0] = 8 * 4;                  // buffer size in bytes, 8 for 8 elements to MBOX_END_TAG; 4 for each elements is 4 bytes (u32)
+  mbox_buf[1] = 0x00000000;             // MBOX_REQUEST_CODE;      // fixed code
+  // tags begin
+  mbox_buf[2] = 0x00010005;             // tag identifier
+  mbox_buf[3] = 8;                      // response length
+  mbox_buf[4] = 0x00000000;             // fixed code
+  mbox_buf[5] = 0;                      // output buffer 0, clear it here
+  mbox_buf[6] = 0;                      // output buffer 1, clear it here
+  // tags end
+  mbox_buf[7] = 0x00000000;
+
+  // Send mailbox request via system call
+  ret = sysc_mbox_call(MBOX_CH_PROP, (uint32_t*)mbox_buf); // message passing procedure call
+  mem_start_addr = (uint32_t*)((uint64_t)mbox_buf[5]); // cast to u64 cuz uint32_t* takes 64 bits
+  mem_size = mbox_buf[6];
+  uart_printf("pid = %d, mbox ret=%d\r\n", pid, ret);
+  uart_printf("pid = %d, mem_start_addr=0x%p\r\n", pid, mem_start_addr);
+  uart_printf("pid = %d, mem_size=0x%08X\r\n", pid, mem_size);
+
+  uart_printf("pid = %d, exitting mailbox test\r\n", pid);
 }
 
 static void shell(){
