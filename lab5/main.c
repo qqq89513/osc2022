@@ -205,19 +205,35 @@ static void mailbox_test(){
 
 static void fork_test(){
   uart_printf("\nFork Test, pid %d\n", sysc_getpid());
+  uint64_t tk = 0;
+  int cnt = 1;
   int ret = 0;
-  uint64_t tk_cnt = 0;
   ret = sysc_fork();
   if(ret == 0) { // child
-    uart_printf("child here, pid %d\r\n", sysc_getpid());
-    WAIT_TICKS(tk_cnt, 500000000);
-    uart_printf("child exiting, pid %d\r\n", sysc_getpid());
+    uint64_t cur_sp;
+    asm volatile("mov %0, sp" : "=r"(cur_sp));
+    uart_printf("first child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
+    ++cnt;
+    ret = sysc_fork();
+    if(ret != 0){
+      asm volatile("mov %0, sp" : "=r"(cur_sp));
+      uart_printf("first child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
+    }
+    else{
+      while (cnt < 5) {
+        asm volatile("mov %0, sp" : "=r"(cur_sp));
+        uart_printf("second child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
+        WAIT_TICKS(tk, 100000000);
+        ++cnt;
+      }
+    }
     sysc_exit(0);
   }
-  else{
+  else {
     uart_printf("parent here, pid %d, child %d\n", sysc_getpid(), ret);
-    sysc_exit(0);
   }
+
+  sysc_exit(0);
 }
 
 static void shell(){
