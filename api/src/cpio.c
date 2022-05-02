@@ -72,7 +72,7 @@ void cpio_ls(){
 
   // Traverse the linked list
   while(file->next != NULL){
-    uart_printf("%s\r\n", file->pathname);
+    uart_printf("%s, size=%d\r\n", file->pathname, file->file_size);
     file = file->next;
   }
 }

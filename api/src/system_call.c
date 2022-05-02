@@ -1,5 +1,7 @@
 
 #include "system_call.h"
+#include "diy_malloc.h"
+#include "cpio.h"
 #include "sys_reg.h"
 #include "thread.h"
 #include "mbox.h"
@@ -21,7 +23,7 @@ extern void kid_thread_return_fork();   // defined in vect_table_and_execption_h
 static int    priv_getpid();
 static size_t priv_uart_read(char buf[], size_t size);
 static size_t priv_uart_write(const char buf[], size_t size);
-static int    priv_exec(const char *name, char *const argv[]);
+static int    priv_exec(const char *name, char *const argv[], trap_frame *tf);
 static int    priv_fork(trap_frame *tf_mom);
 static void   priv_exit(int status);
 static int    priv_mbox_call(unsigned char ch, unsigned int *mbox);
@@ -53,7 +55,7 @@ void system_call(trap_frame *tf){
       tf->x0 = priv_uart_write((char*)tf->x0, (size_t)tf->x1);
       break;
     case SYSCALL_NUM_EXEC:
-      tf->x0 = priv_exec((char*)tf->x0, (char **)tf->x1);
+      tf->x0 = priv_exec((char*)tf->x0, (char **)tf->x1, tf);
       break;
     case SYSCALL_NUM_FORK:
       tf->x0 = priv_fork(tf);
@@ -126,9 +128,31 @@ static size_t priv_uart_write(const char buf[], size_t size){
 }
 
 int           sysc_exec(const char *name, char *const argv[]){
+  write_gen_reg(x8, SYSCALL_NUM_EXEC);
+  write_gen_reg(x1, argv);    // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, name);    // so write to x0 should be the last one performed
+  asm volatile("svc 0");      // should not return
   return 0;
 }
-static int    priv_exec(const char *name, char *const argv[]){
+static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
+  thread_t *thd = thread_get_current();
+  uint8_t *load_addr = NULL; // 64 pages
+  if(thd->mode == KERNEL){
+    uart_printf("sysc_exec() failed, current thread pid=%d, sysc_exec() for KERNEL thread is now unimplemented\r\n", thd->pid);
+    return -1;
+  }
+
+  // Copy image to a dynamic allocated space
+  load_addr = diy_malloc(64*4096);
+  if(cpio_copy((char*)name, load_addr) != 0){
+    uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
+    return -1;
+  }
+
+  // Modify trap frame, 
+  // so when returning from execeptio, eret sets sp to sp_el0 and jumps to elr_el12
+  tf->elr_el1 = (uint64_t)load_addr;
+  tf->sp_el0 = (uint64_t)thd->user_sp;
   return 0;
 }
 

@@ -26,6 +26,7 @@
 #define CMD_FREE          "f"
 #define CMD_DUMP_PAGE     "dump_page"
 #define CMD_DUMP_RQ       "dump_rq"
+#define CMD_EXEC          "exec"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -53,11 +54,12 @@ void main(void *dtb_addr)
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
 
   thread_init();
-  thread_create(shell, KERNEL);
-  thread_create(fork_test, USER);
-  for(int i=0; i<3; i++) {
-    thread_create(foo, USER);
-  }
+  thread_create(shell, USER);
+  // thread_create(fork_test, USER);
+  // for(int i=0; i<3; i++) {
+  //   thread_create(foo, USER);
+  // }
+  thread_create(foo, USER);
   r_q_dump();
   start_scheduling();
 }
@@ -150,8 +152,15 @@ static void irq_handler(){
     while(1);
   }
 }
+
 static void foo(){
   int pid = sysc_getpid();
+  while(1){
+    uint64_t tk;
+    uart_printf("foo() in background\r\n", 21);
+    WAIT_TICKS(tk, 100000000);
+  }
+  
   if(pid == 7)
     mailbox_test();
   // lr == foo()
@@ -242,7 +251,6 @@ static void shell(){
   int args_cnt = 0;
 
   while(1) {
-    schedule();
 
     // Read cmd
     uart_printf(MACHINE_NAME);
@@ -264,6 +272,7 @@ static void shell(){
         uart_printf(CMD_MALLOC " <size>\t: Allocate memory, <size> in bytes\r\n");
         uart_printf(CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
         uart_printf(CMD_DUMP_RQ "\t\t: Dump run queue\r\n");
+        uart_printf(CMD_EXEC " <file> \t: Reallocate the file (img) and jumps to it.\r\n");
       }
       else if(strcmp_(args[0], CMD_HELLO) == 0){
         uart_printf("Hello World!\r\n");
@@ -331,6 +340,15 @@ static void shell(){
       else if(strcmp_(args[0], CMD_DUMP_RQ) == 0){
         uart_printf("Shell dump run queue:\r\n");
         r_q_dump();
+      }
+      else if(strcmp_(args[0], CMD_EXEC) == 0){
+        if(args_cnt > 1){
+          sysc_exec(args[1], NULL);
+          // Should not get here
+          uart_printf("sys_exec() failed, in shell(), should not get here.\r\n");
+        }
+        else
+          uart_printf("Usage: " CMD_EXEC " <file>\r\n");
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
