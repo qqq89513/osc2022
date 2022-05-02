@@ -72,6 +72,7 @@
 
 .global exception_vector_table_el1
 .global set_exception_vector_table_el1
+.global kid_thread_return_fork
 
 
 .align 11 // vector table should be aligned to 0x800
@@ -229,3 +230,6 @@ error_invalid_el0_32_ex_handler:   // cause: 16
   load_all
   eret
 
+kid_thread_return_fork:
+  load_all
+  eret

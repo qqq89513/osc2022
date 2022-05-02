@@ -4,7 +4,6 @@
 #include "uart.h"
 #include "timer.h"
 
-#define DEFAULT_THREAD_SIZE 4096 // 4kB, this includes the size of a stack and the thread's TCB
 #define PID_KERNEL_MAIN 0
 #define PID_IDLE        1
 

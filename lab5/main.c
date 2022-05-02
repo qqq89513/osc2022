@@ -33,6 +33,7 @@ void general_exception_handler(uint64_t cause, trap_frame *tf);
 
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
+static void fork_test();
 static void foo();
 static void shell();
 static void irq_handler();
@@ -53,7 +54,8 @@ void main(void *dtb_addr)
 
   thread_init();
   thread_create(shell, KERNEL);
-  for(int i=0; i<6; i++) {
+  thread_create(fork_test, USER);
+  for(int i=0; i<3; i++) {
     thread_create(foo, USER);
   }
   r_q_dump();
@@ -199,6 +201,23 @@ static void mailbox_test(){
   uart_printf("pid = %d, mem_size=0x%08X\r\n", pid, mem_size);
 
   uart_printf("pid = %d, exitting mailbox test\r\n", pid);
+}
+
+static void fork_test(){
+  uart_printf("\nFork Test, pid %d\n", sysc_getpid());
+  int ret = 0;
+  uint64_t tk_cnt = 0;
+  ret = sysc_fork();
+  if(ret == 0) { // child
+    uart_printf("child here, pid %d\r\n", sysc_getpid());
+    WAIT_TICKS(tk_cnt, 500000000);
+    uart_printf("child exiting, pid %d\r\n", sysc_getpid());
+    sysc_exit(0);
+  }
+  else{
+    uart_printf("parent here, pid %d, child %d\n", sysc_getpid(), ret);
+    sysc_exit(0);
+  }
 }
 
 static void shell(){

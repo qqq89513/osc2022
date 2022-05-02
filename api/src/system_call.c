@@ -15,12 +15,14 @@
 #define SYSCALL_NUM_MBOX_CALL  6
 #define SYSCALL_NUM_KILL       7
 
+extern void kid_thread_return_fork();   // defined in vect_table_and_execption_handler.S
+
 // Private functions, priv stands for private
 static int    priv_getpid();
 static size_t priv_uart_read(char buf[], size_t size);
 static size_t priv_uart_write(const char buf[], size_t size);
 static int    priv_exec(const char *name, char *const argv[]);
-static int    priv_fork();
+static int    priv_fork(trap_frame *tf_mom);
 static void   priv_exit(int status);
 static int    priv_mbox_call(unsigned char ch, unsigned int *mbox);
 static int    priv_kill(int pid);
@@ -39,6 +41,7 @@ static int    priv_kill(int pid);
 */
 void system_call(trap_frame *tf){
   uint64_t num = tf->x8;
+  thread_t *thd = NULL;
   switch(num){
     case SYSCALL_NUM_GETPID:
       tf->x0 = priv_getpid();
@@ -53,7 +56,8 @@ void system_call(trap_frame *tf){
       tf->x0 = priv_exec((char*)tf->x0, (char **)tf->x1);
       break;
     case SYSCALL_NUM_FORK:
-      tf->x0 = priv_fork();
+      tf->x0 = priv_fork(tf);
+      break;
     case SYSCALL_NUM_EXIT:
       priv_exit((int)tf->x0);
       break;
@@ -64,7 +68,8 @@ void system_call(trap_frame *tf){
       tf->x0 = priv_kill(tf->x0);
       break;
     default:
-      uart_printf("Exeception, unimplemented system call, num=%lu\r\n", num);
+      thd = thread_get_current();
+      uart_printf("Exeception, unimplemented system call, num=%lu, pid=%d, elr_el1=%lX\r\n", num, thd->pid, thd->elr_el1);
   }
 }
 
@@ -128,10 +133,81 @@ static int    priv_exec(const char *name, char *const argv[]){
 }
 
 int           sysc_fork(){
-  return 0;
+  write_gen_reg(x8, SYSCALL_NUM_FORK);
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
 }
-static int    priv_fork(){
-  return 0;
+static int    priv_fork(trap_frame *tf_mom){
+  thread_t *thd_mom = thread_get_current();
+  thread_t *thd_kid = thread_create((void*)tf_mom->elr_el1, thd_mom->mode);
+  thread_t thd_backup;  // backup for kid
+  const uint8_t mom_higher = thd_mom > thd_kid;
+  uint64_t offset = (uint64_t)( mom_higher ? ((uint64_t)thd_mom - (uint64_t)thd_kid) : ((uint64_t)thd_kid - (uint64_t)thd_mom) );
+  uint64_t offset_tf = (uint64_t)tf_mom - (uint64_t)thd_mom;
+  trap_frame *tf_kid = (trap_frame*)((uint64_t)thd_kid + offset_tf);
+  uint8_t *copy_src = NULL, *copy_dest = NULL;
+
+  /* When kid thread is scheduled, it 
+      1. sp updated by switch_to, and than jumps to kid_thread_return_fork() by setting lr=kid_thread_return_fork() 
+      2. In kid_thread_return_fork(), recovery context from sp. Note that sp now is the sp of kid thread
+      3. eret to elr_el1, set sp to sp_el0 if returning back to el0
+      4. Back to the instruction right after "svc 0"
+      5. Get return value from system call, which is 0
+  */
+
+  // Copy mother's stack to kid's stack
+  {
+    // Backup kid
+    thd_backup.allocated_addr = thd_kid->allocated_addr;
+    thd_backup.user_space     = thd_kid->user_space;
+    thd_backup.pid            = thd_kid->pid;
+    thd_backup.ppid           = thd_mom->pid;
+    thd_backup.state          = thd_kid->state;
+    thd_backup.next           = thd_kid->next;
+
+    // Copy momther thread's entire stack and thread info
+    copy_src  = (uint8_t*)thd_mom->allocated_addr;
+    copy_dest = (uint8_t*)thd_kid->allocated_addr;
+    for(size_t i=0; i<DEFAULT_THREAD_SIZE; i++) copy_dest[i] = copy_src[i];
+
+    // Recover kid
+    thd_kid->allocated_addr = thd_backup.allocated_addr;
+    thd_kid->user_space     = thd_backup.user_space;
+    thd_kid->pid            = thd_backup.pid;
+    thd_kid->ppid           = thd_backup.ppid;
+    thd_kid->state          = thd_backup.state;
+    thd_kid->next           = thd_backup.next;
+
+    // Copy mother thread's user stack if it's a user thread
+    if(thd_kid->mode == USER){
+      copy_src  = (uint8_t*)thd_mom->user_space;
+      copy_dest = (uint8_t*)thd_kid->user_space;
+      for(size_t i=0; i<DEFAULT_THREAD_SIZE; i++) copy_dest[i] = copy_src[i];
+    }
+  }
+
+  // Set kid thread sp and lr for switch_to
+  thd_kid->sp = (uint64_t)tf_kid;   // the trap frame is stored on the stack, load_all recover context from stack
+  thd_kid->lr = (uint64_t)kid_thread_return_fork; // jumps to kid_thread_return_fork() when it's first time scheduled
+
+  // Copy mother's trap frame to kid's trap frame
+  copy_src  = (uint8_t*)tf_mom;
+  copy_dest = (uint8_t*)tf_kid;
+  for(size_t i=0; i<sizeof(trap_frame); i++) copy_dest[i] = copy_src[i];
+
+  // Set trap frame values which are different from mother thread's trap frame
+  tf_kid->x0 = 0; // return value of fork() of kid thread is 0
+  tf_kid->fp = mom_higher ? (tf_mom->fp - offset) : (tf_mom->fp + offset);
+  tf_kid->lr = tf_mom->lr;
+  if(tf_mom->sp_el0 == 0)
+    tf_kid->sp_el0 = 0;
+  else{
+    const uint64_t offset_sp_el0 = tf_mom->sp_el0 - (uint64_t)thd_mom->user_space;
+    tf_kid->sp_el0 = (uint64_t)thd_kid->user_space + offset_sp_el0;
+  }
+
+  return thd_kid->pid;
 }
 
 // Thread self terminate, status unimplmented

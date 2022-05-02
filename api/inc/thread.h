@@ -7,6 +7,8 @@ extern "C" {
 
 #include <stdint.h>
 
+#define DEFAULT_THREAD_SIZE 4096 // 4kB, this includes the size of a stack and the thread's TCB
+
 enum task_state {
   RUNNNING=1,
   WAIT_TO_RUN,
