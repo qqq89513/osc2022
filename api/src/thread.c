@@ -23,6 +23,7 @@ static void run_q_insert_tail(thread_t *thd){
   }
   // First thread in queue
   if(run_q_head == NULL && run_q_tail == NULL){
+    thd->next = NULL;
     run_q_head = thd;
     run_q_tail = thd;
   }
