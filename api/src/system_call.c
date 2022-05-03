@@ -6,6 +6,7 @@
 #include "thread.h"
 #include "mbox.h"
 #include "uart.h"
+#include "general.h"
 
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
 #define SYSCALL_NUM_GETPID     0
@@ -103,10 +104,12 @@ size_t        sysc_uart_read(char buf[], size_t size){
 }
 static size_t priv_uart_read(char buf[], size_t size){
   const size_t s = size;
+  EL1_ARM_INTERRUPT_ENABLE(); // since uart_read_byte() blocks is no input
   while(size != 0){
     *buf++ = (char)uart_read_byte();
     size--;
   }
+  EL1_ARM_INTERRUPT_DISABLE();
   return s;
 }
 
@@ -185,6 +188,7 @@ static int    priv_fork(trap_frame *tf_mom){
     // Backup kid
     thd_backup.allocated_addr = thd_kid->allocated_addr;
     thd_backup.user_space     = thd_kid->user_space;
+    thd_backup.user_sp        = thd_kid->user_sp;
     thd_backup.pid            = thd_kid->pid;
     thd_backup.ppid           = thd_mom->pid;
     thd_backup.state          = thd_kid->state;
@@ -198,6 +202,7 @@ static int    priv_fork(trap_frame *tf_mom){
     // Recover kid
     thd_kid->allocated_addr = thd_backup.allocated_addr;
     thd_kid->user_space     = thd_backup.user_space;
+    thd_kid->user_sp        = thd_backup.user_sp;
     thd_kid->pid            = thd_backup.pid;
     thd_kid->ppid           = thd_backup.ppid;
     thd_kid->state          = thd_backup.state;

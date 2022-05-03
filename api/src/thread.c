@@ -62,9 +62,10 @@ static void threads_dump(thread_t *head){
   thread_t *thd = head;
   const uint64_t stack_grows = (uint64_t)thd->allocated_addr + DEFAULT_THREAD_SIZE - thd->sp;
   while(thd != NULL){
-    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%lX, allocated_addr=%lX, .stack_gorws=%lX, .elr_el1=%lX\r\n",
-      thd->ppid, thd->pid, thd->state, thd->mode, (uint64_t)thd->target_func, 
-      (uint64_t)thd->allocated_addr, stack_grows, thd->elr_el1);
+    uart_printf("ppid=%d, pid=%d, state=%d, mode=%d, target_func=%lX, ",
+      thd->ppid, thd->pid, thd->state, thd->mode, (uint64_t)thd->target_func);
+    uart_printf("allocated_addr=%lX, .sp=%lX, .user_sp=%lX, .stack_gorws=%lX, .elr_el1=%lX\r\n", 
+      (uint64_t)thd->allocated_addr, thd->sp, (uint64_t)thd->user_sp, stack_grows, thd->elr_el1);
     thd = thd->next;
   }
 }
@@ -159,7 +160,7 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   space_addr = diy_malloc(DEFAULT_THREAD_SIZE);  // should check return value of diy_malloc()
   thd_new = space_addr;
   stack_start = space_addr + DEFAULT_THREAD_SIZE - 1;
-  stack_start = (thread_t*)(  (uint64_t)stack_start - ((uint64_t)stack_start % 8)  ); // round down to multiple of 8
+  stack_start = (thread_t*)(  (uint64_t)stack_start - ((uint64_t)stack_start % 16)  ); // round down to multiple of 16
   
   thd_new->fp = (uint64_t) stack_start;
   thd_new->sp = (uint64_t) stack_start;
@@ -230,7 +231,7 @@ void exit_call_by_syscall_only(){
   // current thread is not in run queue, so no need to remove it from run queue
   thd->state = EXITED;
   exited_ll_insert_head(thd);
-  // schedule(); // is called by system_call(), which is called by general_exception_handler(). And in general_exception_handler(), schedule is called after system_call().
+  schedule();
 }
 
 int kill_call_by_syscall_only(int pid){
