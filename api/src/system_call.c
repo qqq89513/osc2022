@@ -157,6 +157,8 @@ static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
   tf->elr_el1 = (uint64_t)load_addr;
   tf->sp_el0 = (uint64_t)thd->user_sp;
   return 0;
+  // should call eret here, exec the program direcctly
+  // should also clean the original thread
 }
 
 int           sysc_fork(){
