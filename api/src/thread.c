@@ -237,6 +237,8 @@ void exit_call_by_syscall_only(){
 int kill_call_by_syscall_only(int pid){
   thread_t *thd = run_q_head;
   thread_t *prev = NULL;
+
+  // Search pid in run queue
   while(thd != NULL){
     if(thd->pid == pid)
       break;
@@ -248,10 +250,13 @@ int kill_call_by_syscall_only(int pid){
     return -1;
   }
 
+  // Remove pid from run quue
   thd->state = EXITED;
-  if(prev != NULL)
+  if(run_q_tail == thd)       // pid is the end of run queue
+    run_q_tail = prev;
+  if(prev != NULL)            // pid in the middle of run queue
     prev->next = thd->next;
-  else
+  else // prev == NULL        // pid is the head of run queue
     run_q_head = thd->next;
 
   exited_ll_insert_head(thd);
