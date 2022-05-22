@@ -163,7 +163,7 @@ static void foo(){
     uint64_t tk;
     uart_printf("foo(), pid=%d, in background", pid);
     sysc_uart_write("\r\n", 2);
-    WAIT_TICKS(tk, 1500000000);
+    WAIT_TICKS(tk, 15000000);
   }
   
   if(pid == 7)
