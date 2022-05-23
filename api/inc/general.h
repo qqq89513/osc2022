@@ -3,8 +3,14 @@
 
 #include <stdint.h>
 
+#ifdef VIRTUAL_MEM      // pass -DVIRTUAL_MEM to the compiler for enabling virtual memory
+#define MMIO_BASE       0xFFFF00003F000000 // kernel
+#else
 #define MMIO_BASE       0x3F000000
+#endif
 
+#define PM_RSTC         ((volatile unsigned int*)(MMIO_BASE+0x0010001c))
+#define PM_WDOG         ((volatile unsigned int*)(MMIO_BASE+0x00100024))
 #define GPFSEL0         ((volatile unsigned int*)(MMIO_BASE+0x00200000))
 #define GPFSEL1         ((volatile unsigned int*)(MMIO_BASE+0x00200004))
 #define GPFSEL2         ((volatile unsigned int*)(MMIO_BASE+0x00200008))
