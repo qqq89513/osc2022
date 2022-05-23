@@ -41,32 +41,43 @@ _start:
     b       1b
 2:  // cpu id == 0
 
-    // DTB load address is kept in x0 by GPU. Save it somewhere else
-    mov     x28, x0
+  // DTB load address is kept in x0 by GPU. Save it somewhere else
+  mov     x28, x0
 
-    // set top of stack just before our code (stack grows to a lower address per AAPCS64)
-    ldr     x1, =_start
-    mov     sp, x1
+  // set top of stack just before our code (stack grows to a lower address per AAPCS64)
+  ldr     x1, =_start
+  mov     sp, x1
 
-    // Set privilege from el2 to el1
-    bl      from_el2_to_el1                 // set exeception level from el2 to el1. Next instruction executes in el1
-    bl      set_exception_vector_table_el1  // set look up vector table when exception raised, defined in vect_talbe_and_exeception_handler.S
+  // Set privilege from el2 to el1
+  bl      from_el2_to_el1                 // set exeception level from el2 to el1. Next instruction executes in el1
+  bl      set_exception_vector_table_el1  // set look up vector table when exception raised, defined in vect_talbe_and_exeception_handler.S
 
-    // clear bss
-    ldr     x1, =_bss_start
-    ldr     w2, =_bss_size
-3:  cbz     w2, 4f
-    str     xzr, [x1], #8
-    sub     w2, w2, #1
-    cbnz    w2, 3b
+  // Setup page table and enable MMU
+  bl  vm_kernel_space
+  ldr x2, =boot_rest   // indirect branch, if direct branch, it jumps to 0x80xxx, instead of 0xFFFF0000080xxx.
+  br  x2
+
+boot_rest:
+  bl clear_bss
 
 jump_to_main:
-    // jump to C code, should not return
-4:  mov     x0, x28    // Put dtb address back as a argument of main
-    bl      main
-    // for failsafe, halt this core too
-    b       1b
+  // jump to C code, should not return
+  mov     x0, x28    // Put dtb address back as a argument of main
+  bl      main
+  // for failsafe, halt this core too
+  b       1b
 
+
+clear_bss:
+  ldr     x1, =_bss_start
+  ldr     w2, =_bss_size
+3:  
+  cbz     w2, 4f
+  str     xzr, [x1], #8
+  sub     w2, w2, #1
+  cbnz    w2, 3b
+4:
+  ret
 
 /* 
   Set exception level from EL2 to EL1
@@ -178,4 +189,50 @@ go_to_thread:
   ldr x9,       [x0, 16 * 6]
   mov sp,  x9
   msr tpidr_el1, x0
+  ret
+
+vm_kernel_space:
+  #define TCR_CONFIG_REGION_48bit (((64 - 48) << 16) | ((64 - 48) << 0)) // t1sz, t0sz, (64-48) bits should be all 1 or 0, for virtual address
+  #define TCR_CONFIG_4KB          ((0b10 << 30) | (0b00 << 14))          // tg1, tg0, set granule 4kB and 4kB
+  #define TCR_CONFIG_DEFAULT      (TCR_CONFIG_REGION_48bit | TCR_CONFIG_4KB)
+  ldr x1, = TCR_CONFIG_DEFAULT
+  msr tcr_el1, x1
+  #define MAIR_DEVICE_nGnRnE      0b00000000
+  #define MAIR_NORMAL_NOCACHE     0b01000100  // high 0100:Normal memory, Outer Non-cacheable; low 0100:Normal memory, Inner Non-cacheable
+  #define MAIR_IDX_DEVICE_nGnRnE  0           // set for Attr0
+  #define MAIR_IDX_NORMAL_NOCACHE 1           // set for Attr1
+  ldr x1, =( \
+    (MAIR_DEVICE_nGnRnE  << (MAIR_IDX_DEVICE_nGnRnE * 8)) | \
+    (MAIR_NORMAL_NOCACHE << (MAIR_IDX_NORMAL_NOCACHE * 8)) \
+  )
+  msr mair_el1, x1
+
+  #define PD_TABLE 0b11
+  #define PD_BLOCK 0b01
+  #define PD_ACCESS (1 << 10)
+  #define BOOT_PGD_ATTR PD_TABLE
+  #define BOOT_PUD_ATTR (PD_ACCESS | (MAIR_IDX_DEVICE_nGnRnE << 2) | PD_BLOCK)
+
+  ldr x0, =pg_dir
+  and x0, x0, 0x0000ffffffffffff  // pg_dir is from link.ld, remove 0xFFFF000000000000 to access phy address
+  add x1, x0, 0x1000
+
+  ldr x2, = BOOT_PGD_ATTR
+  orr x2, x1, x2 // combine the physical address of next level page with attribute.
+  str x2, [x0]
+
+  ldr x2, = BOOT_PUD_ATTR
+  mov x3, 0x00000000
+  orr x3, x2, x3
+  str x3, [x1]      // 1st 1GB mapped by the 1st entry of PUD
+  mov x3, 0x40000000
+  orr x3, x2, x3
+  str x3, [x1, 8]   // 2nd 1GB mapped by the 2nd entry of PUD
+
+  msr ttbr0_el1, x0 // load PGD to the bottom translation-based register.
+  msr ttbr1_el1, x0 // also load PGD to the upper translation based register.
+
+  mrs x2, sctlr_el1 // sctlr_el1 |= 1, enable MMU
+  orr x2 , x2, 1
+  msr sctlr_el1, x2
   ret

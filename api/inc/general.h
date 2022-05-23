@@ -4,10 +4,13 @@
 #include <stdint.h>
 
 #ifdef VIRTUAL_MEM      // pass -DVIRTUAL_MEM to the compiler for enabling virtual memory
-#define MMIO_BASE       0xFFFF00003F000000 // kernel
+#define VM_KERNEL_PREFIX 0xFFFF000000000000LL 
 #else
-#define MMIO_BASE       0x3F000000
+#define VM_KERNEL_PREFIX 0x0000000000000000LL 
 #endif
+
+
+#define MMIO_BASE       (VM_KERNEL_PREFIX | 0x3F000000)
 
 #define PM_RSTC         ((volatile unsigned int*)(MMIO_BASE+0x0010001c))
 #define PM_WDOG         ((volatile unsigned int*)(MMIO_BASE+0x00100024))

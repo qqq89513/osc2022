@@ -3,6 +3,7 @@
 #include "uart.h"
 #include "cpio.h"
 #include "diy_string.h"
+#include "general.h"
 
 #define FDT_MAGIC         0xD00DFEED
 #define FDT_VERSION       0x00000011
@@ -62,8 +63,9 @@ int fdtb_parse(void *dtb_addr, int print, cpio_parse_func *callback){
                       depth, cur, rev32(prop->len), rev32(prop->nameoff), propName, propVal);
         // TODO: Get linux,initrd-start start address here
         if(!strcmp_(FDT_CPIO_INITRAMFS_PROPNAME, propName) && callback != NULL){
-          void *addr = (void*) (uint64_t) rev32( *((uint32_t*)propVal) );
-          (*callback) (addr);
+          uint64_t addr = (uint64_t) rev32( *((uint32_t*)propVal) );
+          addr |= VM_KERNEL_PREFIX;
+          (*callback) ((void*)addr);
         }
         cur += rev32(prop->len);
         cur += pad_to_4(cur);

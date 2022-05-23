@@ -352,7 +352,7 @@ void alloc_page_preinit(uint64_t heap_start, uint64_t heap_end){
   simple_malloc_last_byte += sizeof(buddy_status) * total_pages;  // for the_frame_array
   simple_malloc_last_byte += (16 - (simple_malloc_last_byte%16)); // round to multiple of 16
   __simple_malloc_end = (char*)( simple_malloc_last_byte + 1024); // add 1024 for other purpose
-  uart_printf("__simple_malloc_start=%p, __simple_malloc_end=%p\r\n", &__simple_malloc_start, __simple_malloc_end);
+  uart_printf("alloc_page_preinit(): __simple_malloc_start=%p, __simple_malloc_end=%p\r\n", &__simple_malloc_start, __simple_malloc_end);
   // Init: allocate space
   malloc_page_usage = (int*) simple_malloc(sizeof(int) * total_pages);
   the_frame_array = (buddy_status*) simple_malloc(sizeof(buddy_status) * total_pages);

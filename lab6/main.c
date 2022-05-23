@@ -13,7 +13,7 @@
 #include "system_call.h"
 #include <stdint.h>
 
-#define MACHINE_NAME "rpi5-baremetal-lab6$ "
+#define MACHINE_NAME "rpi-baremetal-lab6$ "
 #define CMD_HELP     "help"
 #define CMD_HELLO    "hello"
 #define CMD_REBOOT   "reboot"
@@ -49,15 +49,16 @@ void main(void *dtb_addr)
 
   // say hello
   uart_printf("\r\n\r\n");
-  uart_printf("Welcome------------------------ lab 5\r\n");
+  uart_printf("Welcome------------------------ lab 6\r\n");
 
-  uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
+  uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p, MMIO_BASE=0x%llX\r\n", dtb_addr, &__image_start, &__image_end, MMIO_BASE);
 
-  thread_init();
-  thread_create(shell, USER);
-  thread_create(foo, USER);
-  r_q_dump();
-  start_scheduling();
+  // thread_init();
+  // thread_create(shell, USER);
+  // thread_create(foo, USER);
+  // r_q_dump();
+  // start_scheduling();
+  shell();
 }
 
 static int spilt_strings(char** str_arr, char* str, char* deli){
@@ -78,7 +79,7 @@ static void sys_init(void *dtb_addr){
   uart_init();
 
   // Device tree parse
-  const long int dtb_size = fdtb_parse(dtb_addr, 0, cpio_parse);
+  const long int dtb_size = fdtb_parse((void*)((uint64_t)dtb_addr | VM_KERNEL_PREFIX), 0, cpio_parse);
 
   // Memory init
   uint32_t *mem_start_addr = 0;
