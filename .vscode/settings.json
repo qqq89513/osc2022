@@ -20,7 +20,8 @@
     "sys_reg.h": "c",
     "timer.h": "c",
     "thread.h": "c",
-    "threads.h": "c"
+    "threads.h": "c",
+    "system_call.h": "c"
   }
 
 }

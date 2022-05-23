@@ -4,6 +4,8 @@
 #include "uart.h"
 #include "timer.h"
 
+#ifdef THREADS  // pass -DTHREADS to compiler for lab5
+
 #define PID_KERNEL_MAIN 0
 #define PID_IDLE        1
 
@@ -263,3 +265,5 @@ int kill_call_by_syscall_only(int pid){
 
   return 0;  
 }
+
+#endif

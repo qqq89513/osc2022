@@ -7,7 +7,7 @@
 #include "mbox.h"
 #include "uart.h"
 #include "general.h"
-
+#ifdef THREADS  // pass -DTHREADS to compiler for lab5
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
 #define SYSCALL_NUM_GETPID     0
 #define SYSCALL_NUM_UART_READ  1
@@ -274,3 +274,4 @@ int           sysc_kill(int pid){
 static int    priv_kill(int pid){
   return kill_call_by_syscall_only(pid);
 }
+#endif
