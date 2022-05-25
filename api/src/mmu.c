@@ -47,7 +47,7 @@ void mmu_init(){
   for(uint64_t i=0; i<504; i++)
     PMD[i] = (i << 21) | PD_ACCESS | (MAIR_IDX_NORMAL_NOCACHE<<MAIR_SHIFT) | PD_BLOCK;
 
-  // 0x40000000 ~ 0x80000000: Device
+  // 0x3f000000 ~ 0x40000000: Device
   for(uint64_t i=504; i<512; i++)
     PMD[i] = (i << 21) | PD_ACCESS | (MAIR_IDX_DEVICE_nGnRnE<<MAIR_SHIFT) | PD_BLOCK;
 

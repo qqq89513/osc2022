@@ -53,11 +53,11 @@ void main(void *dtb_addr)
 
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p, MMIO_BASE=0x%llX\r\n", dtb_addr, &__image_start, &__image_end, MMIO_BASE);
 
-  // thread_init();
-  // thread_create(shell, USER);
-  // thread_create(foo, USER);
-  // r_q_dump();
-  // start_scheduling();
+  thread_init();
+  thread_create(shell, KERNEL); // cannot execute in user mode yet due to mmu
+  thread_create(foo, KERNEL);   // cannot execute in user mode yet due to mmu
+  r_q_dump();
+  start_scheduling();
   shell();
 }
 

@@ -111,7 +111,7 @@ exception_vector_table_el1:
 // After an exeception is raised, exeception level goes from el0 to el1
 // So the exeception raised in el0 is handled in el1
 set_exception_vector_table_el1:
-  adr x1,       exception_vector_table_el1
+  ldr x1,       =exception_vector_table_el1 // use indirect for virtual addr
   msr vbar_el1, x1
   ret
 
