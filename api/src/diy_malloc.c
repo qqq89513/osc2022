@@ -1,5 +1,6 @@
 
 #include "diy_malloc.h"
+#include "general.h"
 #include <stddef.h>
 #include "uart.h"
 
@@ -422,6 +423,10 @@ void alloc_page_init(uint64_t heap_start, uint64_t heap_end){
       p = p + block_size - 1;
     }
   }
+}
+
+void mem_reserve_kernel_vm(uint64_t start, uint64_t end){
+  mem_reserve(VM_KERNEL_PREFIX | start, VM_KERNEL_PREFIX | end);
 }
 
 void mem_reserve(uint64_t start, uint64_t end){

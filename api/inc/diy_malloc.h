@@ -37,6 +37,7 @@ void alloc_page_init();
 int alloc_page(int page_cnt, int verbose);
 int free_page(int page_index, int verbose);
 void mem_reserve(uint64_t start, uint64_t end);
+void mem_reserve_kernel_vm(uint64_t start, uint64_t end);
 
 // Dump functions
 void dump_the_frame_array();

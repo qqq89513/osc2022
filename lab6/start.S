@@ -53,10 +53,12 @@ _start:
   bl      from_el2_to_el1                 // set exeception level from el2 to el1. Next instruction executes in el1
   bl      set_exception_vector_table_el1  // set look up vector table when exception raised, defined in vect_talbe_and_exeception_handler.S
 
+#ifdef VIRTUAL_MEM
   // Setup page table and enable MMU
   bl  mmu_init
   ldr x2, =boot_rest   // indirect branch, if direct branch, it jumps to 0x80xxx, instead of 0xFFFF0000080xxx.
   br  x2               // from now on, instructions are fetched from virtual spaces
+#endif
 
 boot_rest:
   bl clear_bss

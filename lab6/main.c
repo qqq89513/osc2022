@@ -87,11 +87,11 @@ static void sys_init(void *dtb_addr){
   mbox_arm_mem_info(&mem_start_addr, &mem_size);
   mem_start_addr = (uint32_t*)( (uint64_t)(mem_start_addr) | VM_KERNEL_PREFIX );
   alloc_page_preinit((uint64_t)mem_start_addr, (uint64_t)mem_start_addr + mem_size);
-  mem_reserve(0x0, 0x1000);                                       // spin tables for multicore boot
-  mem_reserve((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
-  mem_reserve((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
-  mem_reserve(0x8000000, 0x8000000 + 248320);                     // initramfs, hard coded
-  mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
+  mem_reserve_kernel_vm(0x0, 0x1000);                                       // spin tables for multicore boot
+  mem_reserve_kernel_vm((uint64_t)&__image_start, (uint64_t)&__image_end);  // kernel image
+  mem_reserve_kernel_vm((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
+  mem_reserve_kernel_vm(0x8000000, 0x8000000 + 248320);                     // initramfs, hard coded
+  mem_reserve_kernel_vm((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
   alloc_page_init();
 
   // Timer init for Lab5, basic 2, Video Player

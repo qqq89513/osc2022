@@ -27,7 +27,7 @@ SECTIONS
   /* For page table */
   . = ALIGN(0x1000);  /* don't know why align 0x1000 */
   pg_dir = .;
-	.data.pgd : { . += (3 * (1 << 12)); }
+	. += (4 * 0x1000); /* actually we only need 3*0x1000, but alloc_page_init() fails. maybe overlapped with __simple_malloc */
 
   /* pool for simple_malloc() */
   . = ALIGN(8);
