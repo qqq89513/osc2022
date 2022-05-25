@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "sys_reg.h"
 #include "system_call.h"
+#include "mmu.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi-baremetal-lab6$ "
@@ -92,6 +93,7 @@ static void sys_init(void *dtb_addr){
   mem_reserve_kernel_vm((uint64_t)&__stack_end, (uint64_t)&__stack_start);  // stack, grows downward, so range is from end to start
   mem_reserve_kernel_vm(0x8000000, 0x8000000 + 248320);                     // initramfs, hard coded
   mem_reserve_kernel_vm((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
+  mem_reserve_kernel_vm(PAGE_TABLE_STATICS_START_ADDR, PAGE_TABLE_STATICS_END_ADDR); // reserve space for static(PGD, PUD, PMD) page table, for basic 1
   alloc_page_init();
 
   // Timer init for Lab5, basic 2, Video Player

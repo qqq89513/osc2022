@@ -1,6 +1,5 @@
 #include "sys_reg.h"
-
-extern uint64_t pg_dir;
+#include "mmu.h"
 
 #define TCR_CONFIG_REGION_48bit (((64 - 48) << 16) | ((64 - 48) << 0)) // t1sz, t0sz, (64-48) bits should be all 1 or 0, for virtual address
 #define TCR_CONFIG_4KB          ((0b10 << 30) | (0b00 << 14))          // tg1, tg0, set granule 4kB and 4kB
@@ -25,7 +24,7 @@ void mmu_init(){
     (MAIR_DEVICE_nGnRnE  << (MAIR_IDX_DEVICE_nGnRnE * 8)) |   // set MAIR attr0
     (MAIR_NORMAL_NOCACHE << (MAIR_IDX_NORMAL_NOCACHE * 8)) ); // set MAIR attr1
 
-  uint64_t *PGD = (uint64_t*)( (uint64_t)(&pg_dir) & KERNEL_VM_TO_PM_MASK ); // pg_dir is from link.ld, remove 0xFFFF000000000000 to access phy address
+  uint64_t *PGD = (uint64_t*)( PAGE_TABLE_STATICS_START_ADDR & KERNEL_VM_TO_PM_MASK ); // pg_dir is from link.ld, remove 0xFFFF000000000000 to access phy address
   uint64_t *PUD = (uint64_t*)((uint64_t)PGD + 0x1000);  // L1 table, entry points to L2 table or 1GB block
   uint64_t *PMD = (uint64_t*)((uint64_t)PGD + 0x2000);  // L2 table, entry points to L3 table or 2MB block
 

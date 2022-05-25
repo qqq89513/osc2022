@@ -140,10 +140,10 @@ int           sysc_exec(const char *name, char *const argv[]){
 static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
   thread_t *thd = thread_get_current();
   uint8_t *load_addr = NULL; // 64 pages
-  if(thd->mode == KERNEL){
-    uart_printf("sysc_exec() failed, current thread pid=%d, sysc_exec() for KERNEL thread is now unimplemented\r\n", thd->pid);
-    return -1;
-  }
+  // if(thd->mode == KERNEL){
+  //   uart_printf("sysc_exec() failed, current thread pid=%d, sysc_exec() for KERNEL thread is now unimplemented\r\n", thd->pid);
+  //   return -1;
+  // }
 
   // Copy image to a dynamic allocated space
   load_addr = diy_malloc(64*4096);
