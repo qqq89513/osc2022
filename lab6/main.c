@@ -107,8 +107,12 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
   // Enter critical section
   EL1_ARM_INTERRUPT_DISABLE();
 
-  // thread_t *thd = thread_get_current();
-  // uart_printf("In exception handler, pid=%d, cause=%lu, elr_el1=0x%lX\r\n", thd->pid, cause, tf->elr_el1);
+  // timer interrupt triggers 0x00 and 0x56000000, don't know why
+  // system call triggers 0x56000000, for svc
+  // more info: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/ESR-EL1--Exception-Syndrome-Register--EL1-
+  if(tf->esr_el1 != 0x00 && tf->esr_el1 != 0x56000000)
+    cause |= 0xFF0000; // force go to default in the following switch
+
   switch(cause){
     // synchornous (svc)
     case 5:  case 9:
@@ -127,7 +131,7 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
     case 13: case 14: case 15: case 16:
     default:
       uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
-        tf->spsr_el1, tf->elr_el1, tf->esr_el1, cause);
+        tf->spsr_el1, tf->elr_el1, tf->esr_el1, cause & 0x00FFFF);
       uart_printf("Above exception unhandled\r\n");
   }
 
