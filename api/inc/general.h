@@ -37,7 +37,7 @@
 #define GPPUD_PULL_DOWN 0x01
 #define GPPUD_PULL_UP   0x02
 
-#define CORE0_IRQ_SOURCE                 ((volatile uint32_t*)(0x40000060))  // ref: page 16, https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
+#define CORE0_IRQ_SOURCE                 ((volatile uint32_t*)(VM_KERNEL_PREFIX | 0x40000060))  // ref: page 16, https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
 #define COREx_IRQ_SOURCE_CNTPNSIRQ_MASK  ((volatile uint32_t) (1<<1))        // don't know why left shift 1
 
 #define WAIT_TICKS(cnt, tk) {cnt = tk; while(cnt--) { asm volatile("nop"); }}

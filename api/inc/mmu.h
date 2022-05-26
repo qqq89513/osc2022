@@ -12,6 +12,13 @@ extern "C" {
 #define PAGE_TABLE_STATICS_START_ADDR     0x1000
 #define PAGE_TABLE_STATICS_END_ADDR       (PAGE_TABLE_STATICS_START_ADDR + (0x1000*3))
 
+#define DEFAULT_THREAD_VA_CODE_START  0x0000
+#define DEFAULT_THREAD_VA_STACK_START 0xFFFFFFFFB000
+
+#define CLEAR_LOW_12bit(num)  ((num) & 0xFFFFFFFFFFFFF000)
+#define KERNEL_VA_TO_PA(addr) (((uint64_t)(addr)) & 0x0000FFFFFFFFFFFF)
+#define KERNEL_PA_TO_VA(addr) (((uint64_t)(addr)) | 0xFFFF000000000000)
+
 uint64_t *new_page_table();
 void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num);
 void dump_page_table(uint64_t *pgd);

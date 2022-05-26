@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-
+#include <general.h>
 #include <stdint.h>
-
+#define CORE0_TIMER_IRQ_CTRL (VM_KERNEL_PREFIX | 0x40000040) // Address: 0x4000_0040 Core 0 Timers interrupt control, ref: https://datasheets.raspberrypi.com/bcm2836/bcm2836-peripherals.pdf
 
 // User can declare function as int callback1 (uint64_t);
 typedef int (timer_callback) (uint64_t); // function of ( int timer_callback(uint64_t data); )

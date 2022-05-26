@@ -188,6 +188,9 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   if(thd_parent != NULL)   thd_new->ppid = 0;               // Thread created from other thread
   else                     thd_new->ppid = thd_parent->pid; // Thread created from main() from kernel
 
+#ifdef VIRTUAL_MEM
+  thd_new->ttbr0_el1 = read_sysreg(ttbr0_el1);
+#endif
   run_q_insert_tail(thd_new);
   pid_count++;
   return thd_new;

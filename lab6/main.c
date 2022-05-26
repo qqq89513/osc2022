@@ -54,17 +54,6 @@ void main(void *dtb_addr)
 
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p, MMIO_BASE=0x%llX\r\n", dtb_addr, &__image_start, &__image_end, MMIO_BASE);
 
-  // Test of map_pages
-  uint64_t *ptable = new_page_table();
-  uint64_t *map_to = diy_malloc(PAGE_SIZE*4);
-  map_pages(ptable, 0xffffffffb000, (uint64_t)map_to, 4);
-  map_to = diy_malloc(PAGE_SIZE*64);
-  map_pages(ptable, 0, (uint64_t)map_to, 64);
-  dump_page_table(ptable);
-  dump_the_frame_array();
-  dupmp_frame_freelist_arr();
-  while(1);
-
   thread_init();
   thread_create(shell, KERNEL); // cannot execute in user mode yet due to mmu
   thread_create(foo, KERNEL);   // cannot execute in user mode yet due to mmu
@@ -141,9 +130,9 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
     case  7: case  8: case 11: case 12:
     case 13: case 14: case 15: case 16:
     default:
+      uart_printf("Exception unhandled: ");
       uart_printf("spsr_el1 = 0x%08lX, elr_el1 = 0x%08lX, esr_el1 = 0x%08lX, cause = %lu\r\n",
         tf->spsr_el1, tf->elr_el1, tf->esr_el1, cause & 0x00FFFF);
-      uart_printf("Above exception unhandled\r\n");
   }
 
   // Exit critical section

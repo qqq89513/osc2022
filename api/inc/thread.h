@@ -37,6 +37,9 @@ typedef struct thread_t {
   uint64_t spsr_el1;      // for debug purpose, probally works without it
   uint64_t elr_el1;       // for debug purpose, probally works without it
   uint64_t esr_el1;       // for debug purpose, probally works without it
+#ifdef VIRTUAL_MEM
+  uint64_t ttbr0_el1;     // keep by switch_to(), each process has its own page table
+#endif
   void *allocated_addr;   // the address returned from diy_malloc(), passed to diy_free()
   void *user_sp;          // for .state=USER
   void *user_space;       // for .state=USER

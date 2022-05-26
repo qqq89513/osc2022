@@ -166,7 +166,10 @@ switch_to:
   str x9,       [x0, 16 * 7]        // for debug purpose
   mrs x9,       esr_el1             // for debug purpose
   str x9,       [x0, 16 * 7 + 8]    // for debug purpose
-
+#ifdef VIRTUAL_MEM
+  mrs x9,       ttbr0_el1
+  str x9,       [x0, 16 * 8]
+#endif
   ldp x19, x20, [x1, 16 * 0]  // x19=next->x19=, x20=next->x20
   ldp x21, x22, [x1, 16 * 1]
   ldp x23, x24, [x1, 16 * 2]
@@ -181,6 +184,10 @@ switch_to:
   msr elr_el1,  x9                  // for debug purpose
   ldr x9,       [x1, 16 * 7 + 8]    // for debug purpose
   msr esr_el1,    x9
+#ifdef VIRTUAL_MEM
+  ldr x9,       [x1, 16 * 8]
+  msr ttbr0_el1,  x9
+#endif
   msr tpidr_el1, x1           // tpidr_el1 = (void*) next, update current thread
   ret
 

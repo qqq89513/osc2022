@@ -4,10 +4,6 @@
 #include "diy_string.h"
 #include "uart.h"
 
-#define CLEAR_LOW_12bit(num)  ((num)  & 0xFFFFFFFFFFFFF000)
-#define KERNEL_VA_TO_PA(addr) (((uint64_t)(addr)) & 0x0000FFFFFFFFFFFF)
-#define KERNEL_PA_TO_VA(addr) (((uint64_t)(addr)) | 0xFFFF000000000000)
-
 #define TCR_CONFIG_REGION_48bit (((64 - 48) << 16) | ((64 - 48) << 0)) // t1sz, t0sz, (64-48) bits should be all 1 or 0, for virtual address
 #define TCR_CONFIG_4KB          ((0b10 << 30) | (0b00 << 14))          // tg1, tg0, set granule 4kB and 4kB
 #define TCR_CONFIG_DEFAULT      (TCR_CONFIG_REGION_48bit | TCR_CONFIG_4KB)
@@ -35,8 +31,8 @@ uint64_t *new_page_table(){
 }
 
 void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num){
-  if (pgd == NULL){
-    uart_printf("Error, in map_pages(), pgd=NULL\r\n");
+  if (pgd == NULL || pa_start == 0){
+    uart_printf("Error, in map_pages(), pgd=0x%p, pa_start=0x%p\r\n", pgd, (void*)pa_start);
     return;
   }
 
@@ -61,7 +57,7 @@ void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num){
       
       // Allocate a table that table[index[lv]] can point to
       if(table[index[lv]] == 0){
-        table[index[lv]] = (uint64_t)(KERNEL_VA_TO_PA(new_page_table())) | PD_TABLE;
+        table[index[lv]] = KERNEL_VA_TO_PA(new_page_table()) | PD_TABLE;
       }
 
       // Remove attributes at low 12 bits

@@ -7,6 +7,8 @@
 #include "mbox.h"
 #include "uart.h"
 #include "general.h"
+#include "mmu.h"
+
 #ifdef THREADS  // pass -DTHREADS to compiler for lab5
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
 #define SYSCALL_NUM_GETPID     0
@@ -169,17 +171,37 @@ int           exec_from_kernel_to_user_vm(const char *name){
   }
 
   // Copy image to a dynamic allocated space
-  load_addr = diy_malloc(64*4096);
+  load_addr = diy_malloc(PAGE_SIZE*64);
   if(cpio_copy((char*)name, load_addr) != 0){
     uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
     return -1;
   }
 
-  void *user_space = diy_malloc(DEFAULT_THREAD_SIZE);
+  // Map custom virtual address to dynamic allocated address
+  // Note that diy_malloc() return virtual (with kernel prefix), map_pages() remove it for physical
+  void *user_space = diy_malloc(PAGE_SIZE*4);
+  uint64_t *pgd = (uint64_t*)KERNEL_VA_TO_PA(new_page_table());
+  map_pages(pgd, DEFAULT_THREAD_VA_CODE_START,  (uint64_t)load_addr, 64);  // map for code space
+  map_pages(pgd, DEFAULT_THREAD_VA_STACK_START, (uint64_t)user_space, 4);  // map for stack
+  
+  // Use virtual address instead
+  load_addr = (void*) DEFAULT_THREAD_VA_CODE_START;
+  user_space = (void*) DEFAULT_THREAD_VA_STACK_START;
+
   thd->target_func = load_addr;
   thd->user_space = user_space;
   thd->user_sp = user_space + DEFAULT_THREAD_SIZE - 1;
   thd->user_sp = (void*)(  (uint64_t)thd->user_sp - ((uint64_t)thd->user_sp % 16)  ); // round down to multiple of 16
+  thd->ttbr0_el1 = (uint64_t)pgd;
+
+  // Change ttbr0_el1
+  write_gen_reg(x0, thd->ttbr0_el1);
+  asm volatile("dsb ish");            // ensure write has completed
+  asm volatile("msr ttbr0_el1, x0");  // switch translation based address.
+  asm volatile("tlbi vmalle1is");     // invalidate all TLB entries
+  asm volatile("dsb ish");            // ensure completion of TLB invalidatation
+  asm volatile("isb");                // clear pipeline
+
   thread_go_to_el0();
   uart_printf("Exception, exec_from_kernel_to_user_vm(), should never get here\r\n");
   return 0;
