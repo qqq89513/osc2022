@@ -356,9 +356,10 @@ static void shell(){
       }
       else if(strcmp_(args[0], CMD_EXEC) == 0){
         if(args_cnt > 1){
-          sysc_exec(args[1], NULL);
+          // sysc_exec(args[1], NULL);
+          exec_from_kernel_to_user_vm(args[1]);
           // Should not get here
-          uart_printf("sys_exec() failed, in shell(), should not get here.\r\n");
+          uart_printf("exec_from_kernel_to_user_vm() failed, in shell(), should not get here.\r\n");
         }
         else
           uart_printf("Usage: " CMD_EXEC " <file>\r\n");

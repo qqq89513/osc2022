@@ -58,7 +58,7 @@ void r_q_dump();
 void exited_ll_dump();
 void exit_call_by_syscall_only();
 int kill_call_by_syscall_only(int pid);
-
+void thread_go_to_el0();
 
 #ifdef __cplusplus
 }

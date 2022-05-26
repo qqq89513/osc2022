@@ -90,7 +90,8 @@ static void clean_exited(){
   }
   exited_ll_head = NULL; // exited list is now empty
 }
-static void thread_go_to_el0(){
+
+void thread_go_to_el0(){
   thread_t *thd = thread_get_current();
   
   uart_printf("pid %d going to el0 now\r\n", thd->pid);

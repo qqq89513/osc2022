@@ -160,6 +160,32 @@ static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
   // should call eret here, exec the program direcctly
   // should also clean the original thread
 }
+int           exec_from_kernel_to_user_vm(const char *name){
+  thread_t *thd = thread_get_current();   // raise syn exception if running under el0
+  uint8_t *load_addr = NULL; // 64 pages
+  if(thd->mode != KERNEL){
+    uart_printf("exec_from_kernel_to_user_vm() failed, current thread pid=%d is not kernel thread.\r\n", thd->pid);
+    return -1;
+  }
+
+  // Copy image to a dynamic allocated space
+  load_addr = diy_malloc(64*4096);
+  if(cpio_copy((char*)name, load_addr) != 0){
+    uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
+    return -1;
+  }
+
+  void *user_space = diy_malloc(DEFAULT_THREAD_SIZE);
+  thd->target_func = load_addr;
+  thd->user_space = user_space;
+  thd->user_sp = user_space + DEFAULT_THREAD_SIZE - 1;
+  thd->user_sp = (void*)(  (uint64_t)thd->user_sp - ((uint64_t)thd->user_sp % 16)  ); // round down to multiple of 16
+  thread_go_to_el0();
+  uart_printf("Exception, exec_from_kernel_to_user_vm(), should never get here\r\n");
+  return 0;
+  // should call eret here, exec the program direcctly
+  // should also clean the original thread
+}
 
 int           sysc_fork(){
   write_gen_reg(x8, SYSCALL_NUM_FORK);

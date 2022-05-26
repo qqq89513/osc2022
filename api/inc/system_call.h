@@ -15,6 +15,7 @@ int    sysc_getpid();
 size_t sysc_uart_read(char buf[], size_t size);
 size_t sysc_uart_write(const char buf[], size_t size);
 int    sysc_exec(const char *name, char *const argv[]);
+int    exec_from_kernel_to_user_vm(const char *name);
 int    sysc_fork();
 void   sysc_exit(int status);
 int    sysc_mbox_call(unsigned char ch, unsigned int *mbox);
