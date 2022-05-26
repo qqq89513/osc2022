@@ -69,7 +69,7 @@ void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num){
 
     // leve3, aka PTE
     if(table[index[3]] != 0)
-      uart_printf("Error, in map_pages(), PTE[%d]=%lx alread mapped\r\n", index[3], table[index[3]]);
+      uart_printf("Warning, in map_pages(), PTE[%d]=%lx alread mapped\r\n", index[3], table[index[3]]);
     table[index[3]] = (pa_start + n*PAGE_SIZE) | PD_ACCESS | PD_USER_KERNEL_ACCESS | (MAIR_IDX_NORMAL_NOCACHE << MAIR_SHIFT) | PD_PAGE;
   }
 }

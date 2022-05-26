@@ -148,11 +148,20 @@ static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
   // }
 
   // Copy image to a dynamic allocated space
-  load_addr = diy_malloc(64*4096);
+  load_addr = diy_malloc(PAGE_SIZE*64);
   if(cpio_copy((char*)name, load_addr) != 0){
     uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
     return -1;
   }
+
+#ifdef VIRTUAL_MEM
+  // Map custom virtual address to dynamic allocated address
+  // Note that diy_malloc() return virtual (with kernel prefix), map_pages() remove it for physical
+  map_pages((uint64_t*)thd->ttbr0_el1, DEFAULT_THREAD_VA_CODE_START,  (uint64_t)load_addr, 64);  // map for code space
+  
+  // Use virtual address instead
+  load_addr = (void*) DEFAULT_THREAD_VA_CODE_START;
+#endif
 
   // Modify trap frame, 
   // so when returning from execeptio, eret sets sp to sp_el0 and jumps to elr_el12
@@ -162,6 +171,7 @@ static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
   // should call eret here, exec the program direcctly
   // should also clean the original thread
 }
+#ifdef VIRTUAL_MEM
 int           exec_from_kernel_to_user_vm(const char *name){
   thread_t *thd = thread_get_current();   // raise syn exception if running under el0
   uint8_t *load_addr = NULL; // 64 pages
@@ -208,6 +218,7 @@ int           exec_from_kernel_to_user_vm(const char *name){
   // should call eret here, exec the program direcctly
   // should also clean the original thread
 }
+#endif
 
 int           sysc_fork(){
   write_gen_reg(x8, SYSCALL_NUM_FORK);
