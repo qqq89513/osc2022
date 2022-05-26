@@ -54,6 +54,17 @@ void main(void *dtb_addr)
 
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p, MMIO_BASE=0x%llX\r\n", dtb_addr, &__image_start, &__image_end, MMIO_BASE);
 
+  // Test of map_pages
+  uint64_t *ptable = new_page_table();
+  uint64_t *map_to = diy_malloc(PAGE_SIZE*4);
+  map_pages(ptable, 0xffffffffb000, (uint64_t)map_to, 4);
+  map_to = diy_malloc(PAGE_SIZE*64);
+  map_pages(ptable, 0, (uint64_t)map_to, 64);
+  dump_page_table(ptable);
+  dump_the_frame_array();
+  dupmp_frame_freelist_arr();
+  while(1);
+
   thread_init();
   thread_create(shell, KERNEL); // cannot execute in user mode yet due to mmu
   thread_create(foo, KERNEL);   // cannot execute in user mode yet due to mmu

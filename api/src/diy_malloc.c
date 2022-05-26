@@ -32,7 +32,6 @@ void* simple_malloc(size_t size){
 // Buddy system (page allocation) -----------------------------------
 // Ref: https://oscapstone.github.io/labs/overview.html, https://grasslab.github.io/NYCU_Operating_System_Capstone/labs/lab3.html
 #define ITEM_COUNT(arr) (sizeof(arr) / sizeof(*arr))
-#define PAGE_SIZE 4096 // 4kB
 #define GET_PAGE_NUM(addr)        ( ((addr)-heap_start_addr)/PAGE_SIZE )
 #define GET_PAGE_ADDR(page_num)   ( heap_start_addr+(page_num)*PAGE_SIZE )
 #define GET_PAGE_BUDDY_NODE(page_num) ( (buddynode*) (GET_PAGE_ADDR((page_num)) + 8) ) // +8 to provide offset to prevent confusion of NULL and 0x0000

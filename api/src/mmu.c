@@ -1,5 +1,12 @@
-#include "sys_reg.h"
 #include "mmu.h"
+#include "sys_reg.h"
+#include "diy_malloc.h"
+#include "diy_string.h"
+#include "uart.h"
+
+#define CLEAR_LOW_12bit(num)  ((num)  & 0xFFFFFFFFFFFFF000)
+#define KERNEL_VA_TO_PA(addr) (((uint64_t)(addr)) & 0x0000FFFFFFFFFFFF)
+#define KERNEL_PA_TO_VA(addr) (((uint64_t)(addr)) | 0xFFFF000000000000)
 
 #define TCR_CONFIG_REGION_48bit (((64 - 48) << 16) | ((64 - 48) << 0)) // t1sz, t0sz, (64-48) bits should be all 1 or 0, for virtual address
 #define TCR_CONFIG_4KB          ((0b10 << 30) | (0b00 << 14))          // tg1, tg0, set granule 4kB and 4kB
@@ -11,11 +18,65 @@
 #define MAIR_IDX_NORMAL_NOCACHE 1           // set for Attr1
 #define MAIR_SHIFT              2
 
-#define PD_TABLE 0b11
+#define PD_TABLE 0b11 // for table L0~2
+#define PD_PAGE  0b11 // for table L3
 #define PD_BLOCK 0b01
 #define PD_ACCESS (1 << 10)
+#define PD_USER_KERNEL_ACCESS (1 << 6)
 
-#define KERNEL_VM_TO_PM_MASK 0X0000FFFFFFFFFFFF // for kernel, virtual mem addr to physical mem addr
+#define KERNEL_VM_TO_PM_MASK 0x0000FFFFFFFFFFFF // for kernel, virtual mem addr to physical mem addr
+
+uint64_t *new_page_table(){
+  uint64_t *table_addr = diy_malloc(PAGE_SIZE);
+  memset_(table_addr, 0, PAGE_SIZE);
+  for(size_t i=0; i<(PAGE_SIZE/sizeof(uint64_t)); i++)
+    table_addr[i] = 0;
+  return table_addr;
+}
+
+void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num){
+  if (pgd == NULL){
+    uart_printf("Error, in map_pages(), pgd=NULL\r\n");
+    return;
+  }
+
+  int index[4]; // index of each table for L0~3
+  uint64_t va = 0;
+  uint64_t *table = NULL;
+  uint64_t entry = 0;
+  pa_start = KERNEL_VA_TO_PA(pa_start);
+  for (int n = 0; n < num; ++n) {
+    
+    // Get index of each level
+    va = (uint64_t)(va_start + n*PAGE_SIZE);
+    va >>= 12;   index[3] = va & 0x1ff;
+    va >>= 9;    index[2] = va & 0x1ff;
+    va >>= 9;    index[1] = va & 0x1ff;
+    va >>= 9;    index[0] = va & 0x1ff;
+    table = (uint64_t*) KERNEL_PA_TO_VA((uint64_t)pgd);
+    entry = 0;
+
+    // Find the address of level3 table
+    for(int lv=0; lv<3; lv++) {  // map lv0~2
+      
+      // Allocate a table that table[index[lv]] can point to
+      if(table[index[lv]] == 0){
+        table[index[lv]] = (uint64_t)(KERNEL_VA_TO_PA(new_page_table())) | PD_TABLE;
+      }
+
+      // Remove attributes at low 12 bits
+      entry = CLEAR_LOW_12bit(table[index[lv]]);
+
+      // Next level
+      table = (uint64_t*)KERNEL_PA_TO_VA(entry); // address of the first entry of next level table
+    }
+
+    // leve3, aka PTE
+    if(table[index[3]] != 0)
+      uart_printf("Error, in map_pages(), PTE[%d]=%lx alread mapped\r\n", index[3], table[index[3]]);
+    table[index[3]] = (pa_start + n*PAGE_SIZE) | PD_ACCESS | PD_USER_KERNEL_ACCESS | (MAIR_IDX_NORMAL_NOCACHE << MAIR_SHIFT) | PD_PAGE;
+  }
+}
 
 void mmu_init(){
   write_sysreg(tcr_el1, TCR_CONFIG_DEFAULT);
@@ -56,4 +117,42 @@ void mmu_init(){
   uint64_t temp = read_sysreg(sctlr_el1);
   temp |= 1;  // enable MMU
   write_sysreg(sctlr_el1, temp);
+}
+
+void dump_page_table(uint64_t *pgd){
+  uint64_t *table_L0 = pgd;
+  uint64_t *table_L1, *table_L2, *table_L3;
+  // i0, i1, i2, i3 are index of tables of lv0, lv1, lv2, lv3
+  // L0, aka PGD
+  for(int i0=0; i0<(PAGE_SIZE/8); i0++){
+    if(table_L0[i0] == 0) continue; // skip empty entry
+
+    uart_printf("L0[%d]=0x%lx\r\n", i0, table_L0[i0]);
+    table_L1 = (uint64_t*) CLEAR_LOW_12bit(table_L0[i0]);
+    table_L1 = (uint64_t*) KERNEL_PA_TO_VA(table_L1);
+
+    // L1, aka PUD
+    for(int i1=0; i1<(PAGE_SIZE/8); i1++){
+      if(table_L1[i1] == 0) continue; // skip empty entry
+
+      uart_printf("  L1[%d]=0x%lx\r\n", i1, table_L1[i1]);
+      table_L2 = (uint64_t*) CLEAR_LOW_12bit(table_L1[i1]);
+      table_L2 = (uint64_t*) KERNEL_PA_TO_VA(table_L2);
+
+      // L2, aka PMD
+      for(int i2=0; i2<(PAGE_SIZE/8); i2++){
+        if(table_L2[i2] == 0) continue; // skip empty entry
+
+        uart_printf("    L2[%d]=0x%lx\r\n", i2, table_L2[i2]);
+        table_L3 = (uint64_t*) CLEAR_LOW_12bit(table_L2[i2]);
+        table_L3 = (uint64_t*) KERNEL_PA_TO_VA(table_L3);
+
+        // L3, aka PTE
+        for(int i3=0; i3<(PAGE_SIZE/8); i3++){
+          if(table_L3[i3] == 0) continue; // skip empty entry
+          uart_printf("      L3[%d]=0x%lx\r\n", i3, table_L3[i3]);
+        }
+      }
+    }
+  }
 }

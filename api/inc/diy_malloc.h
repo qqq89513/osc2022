@@ -15,6 +15,8 @@ void* simple_malloc(size_t size);
 
 // Buddy system -----------------------------------------------------
 
+#define PAGE_SIZE 4096 // 4kB
+
 // Considered as a header in an unallocated buddy, pointing next and previous buddy's header with the same buddy size
 typedef struct buddynode{
   struct buddynode *prev; // Null for head
