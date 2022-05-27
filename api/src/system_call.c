@@ -183,9 +183,11 @@ int           exec_from_kernel_to_user_vm(const char *name){
   // Copy image to a dynamic allocated space
   load_addr = diy_malloc(PAGE_SIZE*64);
   if(cpio_copy((char*)name, load_addr) != 0){
-    uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
+    uart_printf("exec_from_kernel_to_user_vm() failed, failed to locate file %s.\r\n", name);
     return -1;
   }
+
+  thd->mode = USER; // later used in fork
 
   // Map custom virtual address to dynamic allocated address
   // Note that diy_malloc() return virtual (with kernel prefix), map_pages() remove it for physical
@@ -277,15 +279,15 @@ static int    priv_fork(trap_frame *tf_mom){
     }
   }
 
-  // Set kid thread sp and lr for switch_to
-  thd_kid->sp = (uint64_t)tf_kid;   // the trap frame is stored on the stack, load_all recover context from stack
-  thd_kid->lr = (uint64_t)kid_thread_return_fork; // jumps to kid_thread_return_fork() when it's first time scheduled
-
-  // Copy mother's trap frame to kid's trap frame
-  copy_src  = (uint8_t*)tf_mom;
-  copy_dest = (uint8_t*)tf_kid;
-  for(size_t i=0; i<sizeof(trap_frame); i++) copy_dest[i] = copy_src[i];
-
+  
+#ifdef VIRTUAL_MEM // Copy page table and remap stack space when virtual memory enabled
+  thd_kid->ttbr0_el1 = KERNEL_VA_TO_PA(new_page_table());
+  copy_page_table((uint64_t*)thd_mom->ttbr0_el1, (uint64_t*)thd_kid->ttbr0_el1);
+  map_pages((uint64_t*)thd_kid->ttbr0_el1, DEFAULT_THREAD_VA_STACK_START, (uint64_t)thd_kid->user_space, DEFAULT_THREAD_SIZE/PAGE_SIZE);
+  map_pages((uint64_t*)thd_kid->ttbr0_el1, KERNEL_PA_TO_VA(0x3c000000), 0x3c000000, (0x3f000000-0x3c000000)/PAGE_SIZE);
+  thd_kid->user_space = (void*)DEFAULT_THREAD_VA_STACK_START;
+  thd_kid->user_sp = thd_mom->user_sp;
+#else // Set fp, sp_el0 offset if virtual memory not enabled
   // Set trap frame values which are different from mother thread's trap frame
   tf_kid->x0 = 0; // return value of fork() of kid thread is 0
   tf_kid->fp = mom_higher ? (tf_mom->fp - offset) : (tf_mom->fp + offset);
@@ -296,7 +298,24 @@ static int    priv_fork(trap_frame *tf_mom){
     const uint64_t offset_sp_el0 = tf_mom->sp_el0 - (uint64_t)thd_mom->user_space;
     tf_kid->sp_el0 = (uint64_t)thd_kid->user_space + offset_sp_el0;
   }
+#endif
 
+  // Set kid thread sp and lr for switch_to
+  thd_kid->sp = (uint64_t)tf_kid;   // the trap frame is stored on the stack, load_all recover context from stack
+  thd_kid->lr = (uint64_t)kid_thread_return_fork; // jumps to kid_thread_return_fork() when it's first time scheduled
+
+  // Copy mother's trap frame to kid's trap frame
+  copy_src  = (uint8_t*)tf_mom;
+  copy_dest = (uint8_t*)tf_kid;
+  for(size_t i=0; i<sizeof(trap_frame); i++) copy_dest[i] = copy_src[i];
+#ifndef VIRTUAL_MEM
+
+  // uart_printf("in priv_fork():\r\n");
+  // uart_printf("  thd_mom sp=%lx, fp=%lx, user_space=%lx, user_sp=%lx, ttbr0=%lx\r\n", thd_mom->fp, thd_mom->sp, (uint64_t)thd_mom->user_space, (uint64_t)thd_mom->user_sp, thd_mom->ttbr0_el1);
+  // uart_printf("  thd_kid sp=%lx, fp=%lx, user_space=%lx, user_sp=%lx, ttbr0=%lx\r\n", thd_kid->fp, thd_kid->sp, (uint64_t)thd_kid->user_space, (uint64_t)thd_kid->user_sp, thd_kid->ttbr0_el1);
+  // uart_printf("  tf_mom=%lx elr_el1=%lx, lr=%lx, sp_el0=%lx, fp=%lx\r\n", (uint64_t)tf_mom, tf_mom->elr_el1, tf_mom->lr, tf_mom->sp_el0, tf_mom->fp);
+  // uart_printf("  tf_kid=%lx elr_el1=%lx, lr=%lx, sp_el0=%lx, fp=%lx\r\n", (uint64_t)tf_kid, tf_kid->elr_el1, tf_kid->lr, tf_kid->sp_el0, tf_kid->fp);
+#endif
   return thd_kid->pid;
 }
 
@@ -320,7 +339,8 @@ int           sysc_mbox_call(unsigned char ch, unsigned int *mbox){
   return ret_val;
 }
 static int    priv_mbox_call(unsigned char ch, unsigned int *mbox){
-  return mbox_call_user_buffer(ch, mbox);
+  int ret = mbox_call_user_buffer(ch, mbox);
+  return ret;
 }
 
 int           sysc_kill(int pid){

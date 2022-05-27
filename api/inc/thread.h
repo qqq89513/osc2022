@@ -6,8 +6,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include "diy_malloc.h"
 
-#define DEFAULT_THREAD_SIZE 4096 // 4kB, this includes the size of a stack and the thread's TCB
+#define DEFAULT_THREAD_SIZE (PAGE_SIZE*4) // 4kB, this includes the size of a stack and the thread's TCB
 
 enum task_state {
   RUNNNING=1,

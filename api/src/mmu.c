@@ -115,8 +115,53 @@ void mmu_init(){
   write_sysreg(sctlr_el1, temp);
 }
 
+void copy_page_table(uint64_t *from, uint64_t *to){
+  from = (uint64_t*)KERNEL_PA_TO_VA(from);
+  to = (uint64_t*)KERNEL_PA_TO_VA(to);
+  uint64_t *TF_L0 = from, *TF_L1, *TF_L2, *TF_L3; // tables of from
+  uint64_t *TT_L0 = to,   *TT_L1, *TT_L2, *TT_L3; // tables of to
+  // i0, i1, i2, i3 are index of tables of lv0, lv1, lv2, lv3
+  // L0, aka PGD
+  for(int i0=0; i0<(PAGE_SIZE/8); i0++){
+    if(TF_L0[i0] == 0) continue; // skip empty entry
+
+    TT_L0[i0] = ENTRY_GET_ATTRS(TF_L0[i0]);
+    TT_L0[i0] |= KERNEL_VA_TO_PA( new_page_table() );
+    TF_L1 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TF_L0[i0]) );
+    TT_L1 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TT_L0[i0]) );
+
+    // L1, aka PUD
+    for(int i1=0; i1<(PAGE_SIZE/8); i1++){
+      if(TF_L1[i1] == 0) continue; // skip empty entry
+
+      TT_L1[i1] = ENTRY_GET_ATTRS(TF_L1[i1]);
+      TT_L1[i1] |= KERNEL_VA_TO_PA( new_page_table() );
+      TF_L2 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TF_L1[i1]) );
+      TT_L2 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TT_L1[i1]) );
+
+      // L2, aka PMD
+      for(int i2=0; i2<(PAGE_SIZE/8); i2++){
+        if(TF_L2[i2] == 0) continue; // skip empty entry
+
+        TT_L2[i2] = ENTRY_GET_ATTRS(TF_L2[i2]);
+        TT_L2[i2] |= KERNEL_VA_TO_PA( new_page_table() );
+        TF_L3 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TF_L2[i2]) );
+        TT_L3 = (uint64_t*) KERNEL_PA_TO_VA( CLEAR_LOW_12bit(TT_L2[i2]) );
+
+        // L3, aka PTE
+        for(int i3=0; i3<(PAGE_SIZE/8); i3++){
+          if(TF_L3[i3] == 0) continue; // skip empty entry
+          TT_L3[i3] = TF_L3[i3];
+          // TT_L3[i3] = ENTRY_GET_ATTRS(TF_L3[i3]);
+          // TT_L3[i3] |= KERNEL_VA_TO_PA( new_page_table() );
+        }
+      }
+    }
+  }
+}
+
 void dump_page_table(uint64_t *pgd){
-  uint64_t *table_L0 = pgd;
+  uint64_t *table_L0 = (uint64_t*)KERNEL_PA_TO_VA(pgd);
   uint64_t *table_L1, *table_L2, *table_L3;
   // i0, i1, i2, i3 are index of tables of lv0, lv1, lv2, lv3
   // L0, aka PGD
