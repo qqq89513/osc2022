@@ -22,6 +22,7 @@ extern "C" {
 uint64_t *new_page_table();
 void map_pages(uint64_t *pgd, uint64_t va_start, uint64_t pa_start, int num);
 void dump_page_table(uint64_t *pgd);
+void *virtual_mem_translate(void *virtual_addr);
 
 #ifdef __cplusplus
 }

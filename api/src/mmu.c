@@ -152,3 +152,13 @@ void dump_page_table(uint64_t *pgd){
     }
   }
 }
+
+void *virtual_mem_translate(void *virtual_addr){
+  asm volatile("mov x4,    %0\n"::"r"(virtual_addr));
+  asm volatile("at  s1e0r, x4\n");
+  uint64_t frame_addr = (uint64_t)read_sysreg(par_el1) & 0xFFFFFFFFF000; // physical frame address
+  uint64_t pa = frame_addr | ((uint64_t)virtual_addr & 0xFFF);                // combine 12bits offset
+  if ((read_sysreg(par_el1) & 0x1) == 1)
+    uart_printf("Error, virtual_mem_translate() failed\r\n");
+  return (void*)pa;
+}

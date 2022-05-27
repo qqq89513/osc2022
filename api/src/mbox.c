@@ -2,6 +2,7 @@
 #include "mbox.h"
 #include "general.h"
 #include "uart.h"
+#include "mmu.h"
 
 /* mailbox message buffer */
 volatile uint32_t  __attribute__((aligned(16))) mbox_buf[36];
@@ -39,11 +40,25 @@ int mbox_call(unsigned char ch)
  * @return 0 on failure, non-zero on success
 */
 int mbox_call_user_buffer(unsigned char ch, unsigned int *mbox){
+#ifdef VIRTUAL_MEM
+  void *addr = 0;
+  if(((uint64_t)mbox & 0xFFFF000000000000) == 0) // translation for lower VA
+    addr = virtual_mem_translate(mbox);
+  else
+    addr = mbox;
+
+  uint32_t temp = (
+    (    ((uint32_t) ((uint64_t)addr)) & ~0xF    ) // & ~0xF clears lower 4 bits
+     | 
+    ( ch & 0xF ) // & 0x0000000F clears upper 28 bits
+  ); // 28 bits(MSB) for value, 4 bits for the channel
+#else
   uint32_t temp = (
     (    ((uint32_t) ((uint64_t)mbox)) & ~0xF    ) // & ~0xF clears lower 4 bits
      | 
     ( ch & 0xF ) // & 0x0000000F clears upper 28 bits
   ); // 28 bits(MSB) for value, 4 bits for the channel
+#endif
 
   // Wait until mailbox is not full (busy)
   while(*MBOX_STATUS & MBOX_FULL);
