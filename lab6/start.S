@@ -186,7 +186,11 @@ switch_to:
   msr esr_el1,    x9
 #ifdef VIRTUAL_MEM
   ldr x9,       [x1, 16 * 8]
-  msr ttbr0_el1,  x9
+  dsb ish           // ensure write has completed
+  msr ttbr0_el1, x9 // switch translation based address.
+  tlbi vmalle1is    // invalidate all TLB entries
+  dsb ish           // ensure completion of TLB invalidatation
+  isb               // clear pipeline
 #endif
   msr tpidr_el1, x1           // tpidr_el1 = (void*) next, update current thread
   ret
