@@ -107,12 +107,6 @@ void general_exception_handler(uint64_t cause, trap_frame *tf){
   // Enter critical section
   EL1_ARM_INTERRUPT_DISABLE();
 
-  // timer interrupt triggers 0x00 and 0x56000000, don't know why
-  // system call triggers 0x56000000, for svc
-  // more info: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Registers/ESR-EL1--Exception-Syndrome-Register--EL1-
-  if(tf->esr_el1 != 0x00 && tf->esr_el1 != 0x56000000)
-    cause |= 0xFF0000; // force go to default in the following switch
-
   switch(cause){
     // synchornous (svc)
     case 5:  case 9:
