@@ -279,6 +279,14 @@ static int    priv_fork(trap_frame *tf_mom){
     }
   }
 
+  // Set kid thread sp and lr for switch_to
+  thd_kid->sp = (uint64_t)tf_kid;   // the trap frame is stored on the stack, load_all recover context from stack
+  thd_kid->lr = (uint64_t)kid_thread_return_fork; // jumps to kid_thread_return_fork() when it's first time scheduled
+
+  // Copy mother's trap frame to kid's trap frame
+  copy_src  = (uint8_t*)tf_mom;
+  copy_dest = (uint8_t*)tf_kid;
+  for(size_t i=0; i<sizeof(trap_frame); i++) copy_dest[i] = copy_src[i];
   
 #ifdef VIRTUAL_MEM // Copy page table and remap stack space when virtual memory enabled
   thd_kid->ttbr0_el1 = KERNEL_VA_TO_PA(new_page_table());
@@ -300,14 +308,6 @@ static int    priv_fork(trap_frame *tf_mom){
   }
 #endif
 
-  // Set kid thread sp and lr for switch_to
-  thd_kid->sp = (uint64_t)tf_kid;   // the trap frame is stored on the stack, load_all recover context from stack
-  thd_kid->lr = (uint64_t)kid_thread_return_fork; // jumps to kid_thread_return_fork() when it's first time scheduled
-
-  // Copy mother's trap frame to kid's trap frame
-  copy_src  = (uint8_t*)tf_mom;
-  copy_dest = (uint8_t*)tf_kid;
-  for(size_t i=0; i<sizeof(trap_frame); i++) copy_dest[i] = copy_src[i];
 #ifndef VIRTUAL_MEM
 
   // uart_printf("in priv_fork():\r\n");
