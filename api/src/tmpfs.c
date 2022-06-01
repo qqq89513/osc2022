@@ -7,7 +7,7 @@
 
 filesystem tmpfs = {.name="tmpfs", .setup_mount=tmpfs_setup_mount};
 file_operations tmpfs_fops = {.write=tmpfs_write, .read=tmpfs_read, .open=tmpfs_open, .close=tmpfs_close};
-vnode_operations tmpfs_vops = {.lookup=tmpfs_lookup, .mkdir=tmpfs_mkdir};
+vnode_operations tmpfs_vops = {.lookup=tmpfs_lookup, .create=tmpfs_create, .mkdir=tmpfs_mkdir};
 
 
 int tmpfs_write(file *file, const void *buf, size_t len){
@@ -40,6 +40,52 @@ int tmpfs_setup_mount(struct filesystem *fs, mount *mount){
 
 int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name){
   return 1;
+}
+int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name){
+
+  // Return if dir_node is not COMP_DIR
+  if(dir_node->comp->type != COMP_DIR){
+    uart_printf("Error, tmpfs_create(), failed creating %s, dir_node_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+      component_name, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
+    return 2;
+  }
+  
+  // Return if already exist
+  vnode *entry = NULL;
+  for(size_t i=0; i<dir_node->comp->len; i++){
+    entry = dir_node->comp->entries[i];
+    if(strcmp_(component_name, entry->comp->comp_name) == 0){
+      uart_printf("Warning, tmpfs_create(), %s already exist under %s, entry=0x%lX, dir_node=0x%lX, \r\n",
+        component_name, dir_node->comp->comp_name, (uint64_t)entry, (uint64_t)dir_node);
+      *target = entry;
+      return 1;
+    }
+  }
+
+  // Return if TMPFS_MAX_ENTRY already created
+  if(dir_node->comp->len >= TMPFS_MAX_ENTRY){
+    uart_printf("Error, tmpfs_create(), failed creating %s, no more entry allowed\r\n", component_name);
+    return 1;
+  }
+  
+  // Create vnode, note that type is not specified here
+  *target = diy_malloc(sizeof(vnode));
+  (*target)->comp = diy_malloc(sizeof(vnode_comp));
+  (*target)->comp->comp_name = (char*)component_name;
+  (*target)->comp->data = NULL;
+  (*target)->comp->len = 0;
+  
+  // Inherit from dir node
+  (*target)->f_ops = dir_node->f_ops;
+  (*target)->v_ops = dir_node->v_ops;
+  (*target)->mount = dir_node->mount;
+  
+  // Update dir node
+  if(dir_node->comp->entries == NULL) dir_node->comp->entries = diy_malloc(sizeof(vnode*) * TMPFS_MAX_ENTRY);
+  dir_node->comp->entries[dir_node->comp->len] = *target;
+  dir_node->comp->len++;
+
+  return 0;
 }
 int tmpfs_lookup(const char *pathname, vnode **target){
   return 1;

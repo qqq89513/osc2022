@@ -9,7 +9,7 @@ extern "C" {
 #include <stddef.h>
 
 #define VFS_MAX_DEPTH 64
-#define VFS_MAX_PATH_LEN 255
+#define O_CREAT 0100 // flag for vfs_open()
 
 typedef enum comp_type{
   COMP_FILE = 1,
@@ -28,8 +28,8 @@ typedef struct vnode_comp{ // vnode component
   enum comp_type type;
   size_t len;       // COMP_DIR: entry count in this directory; COM_FILE: file size in byte
   union {
-    vnode *entries; // for type of COMP_DIR
-    char  *data;    // for type of COM_FILE
+    vnode **entries; // for type of COMP_DIR
+    char  *data;     // for type of COM_FILE
   };
 } vnode_comp;
 
@@ -61,15 +61,15 @@ typedef struct file_operations{
 
 typedef struct vnode_operations{
   int (*lookup)(const char *pathname, vnode **target);
+  int (*create)(vnode *dir_node, vnode **target, const char *component_name);
   int (*mkdir) (vnode *dir_node, vnode **target, const char *component_name);
-  // int (*create)(vnode *dir_node, vnode **target, const char *component_name);
 } vnode_operations;
 
 extern mount root_mount;
 
 
 int register_filesystem(filesystem *fs);
-int vfs_open(char *pathname, int flags, file **target);
+int vfs_open(char *pathname, int flags, file **file_handle);
 int vfs_close(file *file);
 int vfs_write(file *file, void *buf, size_t len);
 int vfs_read(file *file, void *buf, size_t len);

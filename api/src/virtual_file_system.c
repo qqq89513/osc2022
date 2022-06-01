@@ -9,6 +9,7 @@ mount root_mount = {.fs=NULL, .root=&root_vnode};
 
 static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found);
 static char *after_slash(char *pathname);
+void vfs_dump();
 
 int register_filesystem(filesystem *fs){
   // register the file system to the kernel.
@@ -42,7 +43,8 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount = diy_malloc(sizeof(mount));
     mount_at_node->mount->fs = &tmpfs;
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
-    return mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    return ret;
   }
   else{
     uart_printf("Error, vfs_mount(), file system %s is not supported\r\n", fs_name);
@@ -63,7 +65,7 @@ int vfs_lookup(char *pathname, vnode **target){
   }
 }
 static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found){
-  char *rest_path = NULL;
+  /*char *rest_path = NULL;
   switch(search_under->comp->type){
     case COMP_FILE:
       return strcmp_(pathname, search_under->comp->comp_name); // return 0 if match
@@ -81,7 +83,8 @@ static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found){
       uart_printf("Error, lookup_priv(), unknow node type=%d, name=%s, pathname=%s\r\n", 
         search_under->comp->type, search_under->comp->comp_name, pathname);
       return 2;
-  }
+  }*/
+  return 1;
 }
 static char *after_slash(char *pathname){ // return the string pointer right after '/' or '\0'
   int i = 0;
@@ -116,4 +119,12 @@ int vfs_read(file *file, void *buf, size_t len){
   // 2. block if nothing to read for FIFO type
   // 2. return read size or error code if an error occurs.
   return 1;
+}
+
+void vfs_dump(){
+  vnode *entry = NULL;
+  for(size_t i=0; i<root_vnode.comp->len; i++){
+    entry = root_vnode.comp->entries[i];
+    uart_printf("vfs_dump(), i=%lu, name=%s, type=%d\r\n", i, entry->comp->comp_name, entry->comp->type);
+  }
 }

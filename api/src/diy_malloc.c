@@ -540,7 +540,7 @@ void *diy_malloc(size_t size){
         ret = &header[1];
       }
 
-      dump_chunk();
+      // dump_chunk();
       return ret;
     }
 
