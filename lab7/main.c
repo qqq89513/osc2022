@@ -11,6 +11,7 @@
 #include "timer.h"
 #include "sys_reg.h"
 #include "system_call.h"
+#include "virtual_file_system.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi5-baremetal-lab7$ "
@@ -34,7 +35,6 @@ void general_exception_handler(uint64_t cause, trap_frame *tf);
 
 static void sys_init(void *dtb_addr);
 static int spilt_strings(char** str_arr, char* str, char* deli);
-static void fork_test();
 static void foo();
 static void shell();
 static void irq_handler();
@@ -52,6 +52,8 @@ void main(void *dtb_addr)
   uart_printf("Welcome------------------------ lab 7\r\n");
 
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
+
+  vfs_mount("/", "tmpfs");
 
   thread_init();
   thread_create(shell, USER);
@@ -215,39 +217,6 @@ static void mailbox_test(){
   uart_printf("pid = %d, mem_size=0x%08X\r\n", pid, mem_size);
 
   uart_printf("pid = %d, exitting mailbox test\r\n", pid);
-}
-
-static void fork_test(){
-  uart_printf("\nFork Test, pid %d\n", sysc_getpid());
-  uint64_t tk = 0;
-  int cnt = 1;
-  int ret = 0;
-  ret = sysc_fork();
-  if(ret == 0) { // child
-    uint64_t cur_sp;
-    asm volatile("mov %0, sp" : "=r"(cur_sp));
-    uart_printf("first child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
-    ++cnt;
-    ret = sysc_fork();
-    if(ret != 0){
-      asm volatile("mov %0, sp" : "=r"(cur_sp));
-      uart_printf("first child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
-    }
-    else{
-      while (cnt < 5) {
-        asm volatile("mov %0, sp" : "=r"(cur_sp));
-        uart_printf("second child pid=%d, cnt=%d, &cnt=%lX, sp=%lX\n", sysc_getpid(), cnt, (uint64_t)&cnt, cur_sp);
-        WAIT_TICKS(tk, 100000000);
-        ++cnt;
-      }
-    }
-    sysc_exit(0);
-  }
-  else {
-    uart_printf("parent here, pid %d, child %d\n", sysc_getpid(), ret);
-  }
-
-  sysc_exit(0);
 }
 
 static void shell(){
