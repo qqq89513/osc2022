@@ -9,7 +9,6 @@ mount root_mount = {.fs=NULL, .root=&root_vnode};
 
 static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found);
 static char *after_slash(char *pathname);
-void vfs_dump();
 
 int register_filesystem(filesystem *fs){
   // register the file system to the kernel.
@@ -44,6 +43,20 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount->fs = &tmpfs;
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    vnode *node = NULL;
+    vnode *dirnode = NULL;
+    tmpfs_create(&root_vnode, &node, "file1"); node->comp->type = COMP_FILE;
+    tmpfs_create(&root_vnode, &node, "file2"); node->comp->type = COMP_FILE;
+    tmpfs_create(&root_vnode, &node, "dir0"); node->comp->type = COMP_DIR;
+    tmpfs_create(&root_vnode, &node, "dir8"); node->comp->type = COMP_DIR;
+    dirnode = node;
+    tmpfs_create(dirnode, &node, "under8_file0"); node->comp->type = COMP_FILE;
+    tmpfs_create(dirnode, &node, "under8_dir0"); node->comp->type = COMP_DIR;
+    tmpfs_create(dirnode, &node, "under8_dir1"); node->comp->type = COMP_DIR;
+    tmpfs_create(dirnode, &node, "under8_dir2"); node->comp->type = COMP_DIR;
+    dirnode = node;
+    tmpfs_create(dirnode, &node, "more_inner_dir"); node->comp->type = COMP_DIR;
+    vfs_dump_root();
     return ret;
   }
   else{
@@ -121,10 +134,24 @@ int vfs_read(file *file, void *buf, size_t len){
   return 1;
 }
 
-void vfs_dump(){
-  vnode *entry = NULL;
-  for(size_t i=0; i<root_vnode.comp->len; i++){
-    entry = root_vnode.comp->entries[i];
-    uart_printf("vfs_dump(), i=%lu, name=%s, type=%d\r\n", i, entry->comp->comp_name, entry->comp->type);
+
+void vfs_dump_under(vnode *node, int depth){
+  if(node->comp->type == COMP_DIR){
+    vnode *entry = NULL;
+    for(size_t i=0; i<node->comp->len; i++){
+      entry = node->comp->entries[i];
+      for(int k=0; k<depth; k++) uart_printf("    ");
+      uart_printf("%lu, %s, type=%d, len=%lu\r\n", i, entry->comp->comp_name, entry->comp->type, entry->comp->len);
+      if(entry->comp->type == COMP_DIR)
+        vfs_dump_under(entry, depth + 1);
+    }
   }
+  else{
+    uart_printf("Error, vfs_dump_under(), node type is not dir. type=%d, name=%s\r\n", 
+      node->comp->type, node->comp->comp_name);
+  }
+}
+
+void vfs_dump_root(){
+  vfs_dump_under(&root_vnode, 0);
 }
