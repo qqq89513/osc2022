@@ -8,6 +8,9 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 
+#define VFS_MAX_DEPTH 64
+#define VFS_MAX_PATH_LEN 255
+
 typedef enum comp_type{
   COMP_FILE = 1,
   COMP_DIR  // directory
@@ -66,13 +69,13 @@ extern mount root_mount;
 
 
 int register_filesystem(filesystem *fs);
-int vfs_open(const char *pathname, int flags, file **target);
+int vfs_open(char *pathname, int flags, file **target);
 int vfs_close(file *file);
-int vfs_write(file *file, const void *buf, size_t len);
+int vfs_write(file *file, void *buf, size_t len);
 int vfs_read(file *file, void *buf, size_t len);
-int vfs_mkdir(const char *pathname);
-int vfs_mount(const char *pathname, const char *fs_name);
-int vfs_lookup(const char *pathname, vnode **target);
+int vfs_mkdir(char *pathname);
+int vfs_mount(char *pathname, char *fs_name);
+int vfs_lookup(char *pathname, vnode **target);
 
 #ifdef __cplusplus
 }

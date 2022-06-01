@@ -54,6 +54,7 @@ void main(void *dtb_addr)
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
 
   vfs_mount("/", "tmpfs");
+  uart_printf("lookup=%d\r\n", vfs_lookup("/", NULL));
 
   thread_init();
   thread_create(shell, USER);

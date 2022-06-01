@@ -1,6 +1,8 @@
 #include "tmpfs.h"
 #include "virtual_file_system.h"
 #include "uart.h"
+#include "diy_string.h"
+#include "diy_malloc.h"
 
 
 filesystem tmpfs = {.name="tmpfs", .setup_mount=tmpfs_setup_mount};
@@ -26,6 +28,10 @@ int tmpfs_setup_mount(struct filesystem *fs, mount *mount){
     uart_printf("Error, tmpfs_setup_mount(), NULL pointer.");
     uart_printf(" mount=%p, mount->root=%p\r\n", mount, mount==NULL ? NULL : mount->root);
   }
+  mount->root->comp = diy_malloc(sizeof(vnode_comp));
+  mount->root->comp->comp_name = "";
+  mount->root->comp->len = 0;
+  mount->root->comp->entries = NULL;
   mount->root->comp->type = COMP_DIR;
   mount->root->f_ops = &tmpfs_fops;
   mount->root->v_ops = &tmpfs_vops;
