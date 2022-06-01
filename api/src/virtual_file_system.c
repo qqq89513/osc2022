@@ -7,8 +7,71 @@
 vnode root_vnode;
 mount root_mount = {.fs=NULL, .root=&root_vnode};
 
-static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found);
-static char *after_slash(char *pathname);
+static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found);
+static char *skip_first_comp(char *pathname);
+static int first_component(char *pathname, char *comp_name);
+
+// Return 0 on found, 1 not found, 2 or 3 on error. node_found will be set to as deep as possible
+static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found){
+  char *rest_path = NULL;
+  char comp_name[TMPFS_MAX_COMPONENT_NAME];
+  rest_path = skip_first_comp(pathname);
+  first_component(pathname, comp_name);
+
+  // Return if dir_node is not COMP_DIR
+  if(dir_node->comp->type != COMP_DIR){
+    uart_printf("Error, lookup_priv(), failed, pathname=%s, search_under_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+      pathname, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
+    return 2;
+  }
+
+  // Search comp_name under dir_node
+  if(dir_node->v_ops->lookup(dir_node, node_found, comp_name) == 0){
+    dir_node = *node_found;
+
+    // More to lookup and can lookup deeper
+    if     (rest_path[0] != '\0' && dir_node->comp->type == COMP_DIR)
+      return lookup_priv(rest_path, dir_node, node_found);
+
+    // More to lookup and cannot lookup deeper, return not found
+    else if(rest_path[0] != '\0' && dir_node->comp->type == COMP_FILE)
+      return 1;
+
+    // No more to lookup, return found
+    else if(rest_path[0] == '\0')
+      return 0; // pathname found
+
+    // Exception
+    else{
+      uart_printf("Exception, lookup_priv(), should not get here, dir_node=%lX, comp_name=%s, type=%d\r\n",
+        (uint64_t)dir_node, dir_node->comp->comp_name, dir_node->comp->type);
+      return 3;
+    }
+  }
+
+  // comp_name not found under dir_node
+  else
+    return 1;
+}
+static char *skip_first_comp(char *pathname){ // return the string pointer right after '/' or '\0'
+  int i = 0;
+  if(pathname[i] == '/') i++;                           // skip leading '/'
+  while(pathname[i] != '\0' && pathname[i] != '/') i++; // skip first directory
+  if(pathname[i] == '/') i++;                           // skip leading '/'
+  return &pathname[i];
+}
+static int first_component(char *pathname, char *comp_name){
+  int i = 0;
+  if(pathname[i] == '/') pathname++;                    // skip leading '/'
+  while(pathname[i] != '\0' && pathname[i] != '/'){     // copy until end of string or '/'
+    comp_name[i] = pathname[i];
+    i++;
+  }
+  comp_name[i] = '\0';
+  // uart_printf("first_component(), pathname=%s, comp_name=%s\r\n", pathname, comp_name);
+  return 0;
+}
+
 
 int register_filesystem(filesystem *fs){
   // register the file system to the kernel.
@@ -57,8 +120,12 @@ int vfs_mount(char *pathname, char *fs_name){
     dirnode = node;
     tmpfs_create(dirnode, &node, "more_inner_dir0"); node->comp->type = COMP_DIR;
     tmpfs_create(dirnode, &node, "more_inner_dir1"); node->comp->type = COMP_DIR;
+    tmpfs_create(dirnode, &node, "more_inner_file.txt"); node->comp->type = COMP_FILE;
     vfs_dump_root();
-    uart_printf("tmpfs_lookup=%d\r\n", tmpfs_lookup(dirnode, &node, "more_inner_dir1"));
+    if(vfs_lookup("/dir8/under8_dir2/more_inner_file.txt", &node) == 0){
+      uart_printf("Found!, node=0x%lX\r\n", (uint64_t)node);
+    }else
+      uart_printf("Not found!, node=0x%lX\r\n", (uint64_t)node);
     return ret;
   }
   else{
@@ -74,38 +141,8 @@ int vfs_lookup(char *pathname, vnode **target){
     return 0;
   }
   else{
-    char *rest_path = after_slash(pathname);
-    lookup_priv(rest_path, &root_vnode, target);
-    return 1;
+    return lookup_priv(pathname, &root_vnode, target);
   }
-}
-static int lookup_priv(char *pathname, vnode *search_under, vnode **node_found){
-  /*char *rest_path = NULL;
-  switch(search_under->comp->type){
-    case COMP_FILE:
-      return strcmp_(pathname, search_under->comp->comp_name); // return 0 if match
-    case COMP_DIR:
-      rest_path = after_slash(pathname);
-      // Search under directory
-      for(size_t i; i<search_under->comp->len; i++){
-        if(lookup_priv(after_slash, &search_under->comp->entries[i], node_found) == 0){
-          if(node_found != NULL) *node_found = &search_under->comp->entries[i];
-          return 0;
-        }
-      }
-      return 1; // not found under vnode search_under
-    default:
-      uart_printf("Error, lookup_priv(), unknow node type=%d, name=%s, pathname=%s\r\n", 
-        search_under->comp->type, search_under->comp->comp_name, pathname);
-      return 2;
-  }*/
-  return 1;
-}
-static char *after_slash(char *pathname){ // return the string pointer right after '/' or '\0'
-  int i = 0;
-  while(pathname[i] != '\0' && pathname[i] != '/') i++; // skip first directory
-  if(pathname[i] == '/') i++;                           // skip leading '/'
-  return &pathname[i];
 }
 
 int vfs_open(char *pathname, int flags, file **target){
@@ -143,7 +180,8 @@ void vfs_dump_under(vnode *node, int depth){
     for(size_t i=0; i<node->comp->len; i++){
       entry = node->comp->entries[i];
       for(int k=0; k<depth; k++) uart_printf("    ");
-      uart_printf("%lu, %s, type=%d, len=%lu\r\n", i, entry->comp->comp_name, entry->comp->type, entry->comp->len);
+      uart_printf("%lu, 0x%lX, %s, type=%d, len=%lu\r\n", 
+        i, (uint64_t)entry, entry->comp->comp_name, entry->comp->type, entry->comp->len);
       if(entry->comp->type == COMP_DIR)
         vfs_dump_under(entry, depth + 1);
     }

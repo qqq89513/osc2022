@@ -7,7 +7,7 @@ extern "C" {
 #include "virtual_file_system.h"
 
 #define TMPFS_MAX_PATH_LEN 255
-#define TMPFS_MAX_COMPONENT_NAME 16
+#define TMPFS_MAX_COMPONENT_NAME 32
 #define TMPFS_MAX_ENTRY 16
 
 extern filesystem tmpfs;
