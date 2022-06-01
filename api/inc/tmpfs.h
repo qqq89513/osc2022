@@ -21,7 +21,7 @@ int tmpfs_close(file *file);
 // vops
 int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
 int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name);
-int tmpfs_lookup(const char *pathname, vnode **target);
+int tmpfs_lookup(vnode* dir_node, vnode **target, const char* component_name);
 
 int tmpfs_setup_mount(struct filesystem *fs, mount *mount);
 

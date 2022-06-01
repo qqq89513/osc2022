@@ -87,7 +87,25 @@ int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name){
 
   return 0;
 }
-int tmpfs_lookup(const char *pathname, vnode **target){
+int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name){
+
+  // Return if dir_node is not COMP_DIR
+  if(dir_node->comp->type != COMP_DIR){
+    uart_printf("Error, tmpfs_lookup(), failed lookup %s, dir_node_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+      component_name, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
+    return 2;
+  }
+
+  vnode *entry = NULL;
+  for(size_t i=0; i<dir_node->comp->len; i++){
+    entry = dir_node->comp->entries[i];
+    if(strcmp_(component_name, entry->comp->comp_name) == 0){
+      *target = entry;
+      return 0;
+    }
+  }
+
+  // not found under dir_node
   return 1;
 }
 

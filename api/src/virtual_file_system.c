@@ -55,8 +55,10 @@ int vfs_mount(char *pathname, char *fs_name){
     tmpfs_create(dirnode, &node, "under8_dir1"); node->comp->type = COMP_DIR;
     tmpfs_create(dirnode, &node, "under8_dir2"); node->comp->type = COMP_DIR;
     dirnode = node;
-    tmpfs_create(dirnode, &node, "more_inner_dir"); node->comp->type = COMP_DIR;
+    tmpfs_create(dirnode, &node, "more_inner_dir0"); node->comp->type = COMP_DIR;
+    tmpfs_create(dirnode, &node, "more_inner_dir1"); node->comp->type = COMP_DIR;
     vfs_dump_root();
+    uart_printf("tmpfs_lookup=%d\r\n", tmpfs_lookup(dirnode, &node, "more_inner_dir1"));
     return ret;
   }
   else{

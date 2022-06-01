@@ -60,7 +60,7 @@ typedef struct file_operations{
 } file_operations;
 
 typedef struct vnode_operations{
-  int (*lookup)(const char *pathname, vnode **target);
+  int (*lookup)(vnode *dir_node, vnode **target, const char *component_name);
   int (*create)(vnode *dir_node, vnode **target, const char *component_name);
   int (*mkdir) (vnode *dir_node, vnode **target, const char *component_name);
 } vnode_operations;
