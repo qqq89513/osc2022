@@ -185,7 +185,7 @@ int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name){
   // Inherit from dir node
   (*target)->f_ops = dir_node->f_ops;
   (*target)->v_ops = dir_node->v_ops;
-  (*target)->mount = dir_node->mount;
+  (*target)->mount = NULL; // no mount point
   
   // Update dir node
   if(dir_node->comp->entries == NULL) dir_node->comp->entries = diy_malloc(sizeof(vnode*) * TMPFS_MAX_ENTRY);
