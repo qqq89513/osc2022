@@ -33,7 +33,13 @@ int tmpfs_open(vnode *file_node, file **file_handle){
   return 0;
 }
 int tmpfs_close(file *file){
-  return 1;
+  if(file == NULL){
+    uart_printf("Error, tmpfs_close(), file=NULL\r\n");
+    return 1;
+  }
+  memset_(file, 0, sizeof(file)); // not necessarily
+  diy_free(file);
+  return 0;
 }
 
 int tmpfs_setup_mount(struct filesystem *fs, mount *mount){

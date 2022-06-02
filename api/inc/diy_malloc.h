@@ -44,6 +44,7 @@ void mem_reserve_kernel_vm(uint64_t start, uint64_t end);
 // Dump functions
 void dump_the_frame_array();
 void dupmp_frame_freelist_arr();
+void dump_chunk();
 
 void *diy_malloc(size_t size);
 void diy_free(void *addr);

@@ -154,6 +154,7 @@ int vfs_mount(char *pathname, char *fs_name){
     vfs_open("/dir4/dir4_0/file1.txt", O_CREAT, &fh);
     vfs_open("/dir1/dir1_0/more_inner_dir/123", 0, &fh);  // failed since 123 is folder
     vfs_open("/dir1/dir1_0/more_inner_dir/123/abcd", 0, &fh);
+    vfs_close(fh);
     vfs_dump_root();
     if(vfs_lookup("/dir1/dir1_0/more_inner_dir/123/abcd", &node) == 0){
       uart_printf("Found!, node=0x%lX\r\n", (uint64_t)node);
@@ -215,7 +216,7 @@ int vfs_open(char *pathname, int flags, file **file_handle){
 int vfs_close(file *file){
   // 1. release the file handle
   // 2. Return error code if fails
-  return 1;
+  return file->f_ops->close(file);
 }
 
 int vfs_write(file *file, void *buf, size_t len){

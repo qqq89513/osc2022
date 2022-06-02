@@ -91,7 +91,7 @@ void dupmp_frame_freelist_arr(){
     uart_printf("NULL\r\n");
   }
 }
-static void dump_chunk(){
+void dump_chunk(){
   chunk_header *header = NULL;
   // Dump the pages' chunk if they are allocated by diy_malloc()
   for(int i=0; i<total_pages; i++){
@@ -620,6 +620,6 @@ void diy_free(void *addr){
     return;
   }
 
-  dump_chunk();
+  // dump_chunk();
 }
 

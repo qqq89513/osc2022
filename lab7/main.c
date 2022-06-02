@@ -16,7 +16,6 @@
 
 #define MACHINE_NAME "rpi5-baremetal-lab7$ "
 #define CMD_HELP     "help"
-#define CMD_HELLO    "hello"
 #define CMD_REBOOT   "reboot"
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
@@ -26,6 +25,7 @@
 #define CMD_MALLOC        "m"
 #define CMD_FREE          "f"
 #define CMD_DUMP_PAGE     "dump_page"
+#define CMD_DUMP_CHUNK    "dump_chunk"
 #define CMD_DUMP_RQ       "dump_rq"
 #define CMD_EXEC          "exec"
 
@@ -235,7 +235,6 @@ static void shell(){
     if(strlen_(args[0]) > 0){
       if     (strcmp_(args[0], CMD_HELP) == 0){
         uart_printf(CMD_HELP   "\t\t: print this help menu\r\n");
-        uart_printf(CMD_HELLO  "\t\t: print Hello World!\r\n");
         uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
         uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
@@ -247,9 +246,6 @@ static void shell(){
         uart_printf(CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
         uart_printf(CMD_DUMP_RQ "\t\t: Dump run queue\r\n");
         uart_printf(CMD_EXEC " <file> \t: Reallocate the file (img) and jumps to it.\r\n");
-      }
-      else if(strcmp_(args[0], CMD_HELLO) == 0){
-        uart_printf("Hello World!\r\n");
       }
       else if(strcmp_(args[0], CMD_REBOOT) == 0){
         uart_printf("Rebooting...\r\n");
@@ -290,6 +286,9 @@ static void shell(){
         // dump_the_frame_array();
         dump_the_frame_array();
         dupmp_frame_freelist_arr();
+      }
+      else if(strcmp_(args[0], CMD_DUMP_CHUNK) == 0){
+        dump_chunk();
       }
       else if(strcmp_(args[0], CMD_MALLOC) == 0){
         if(args_cnt > 1){
