@@ -19,7 +19,6 @@
 #define CMD_REBOOT   "reboot"
 #define CMD_LS       "ls"
 #define CMD_CAT      "cat"
-#define CMD_LSDEV    "lsdev"
 #define CMD_ALLOCATE_PAGE "ap"
 #define CMD_FREE_PAGE     "fp"
 #define CMD_MALLOC        "m"
@@ -28,6 +27,9 @@
 #define CMD_DUMP_CHUNK    "dump_chunk"
 #define CMD_DUMP_RQ       "dump_rq"
 #define CMD_EXEC          "exec"
+#define CMD_WRITE         "write"
+#define CMD_READ          "read"
+#define CMD_DUMP_VFS      "dump_vfs"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -165,7 +167,7 @@ static void foo(){
     uint64_t tk;
     uart_printf("foo(), pid=%d, in background", pid);
     sysc_uart_write("\r\n", 2);
-    WAIT_TICKS(tk, 1000000000);
+    WAIT_TICKS(tk, 10000000000);
   }
   
   if(pid == 7)
@@ -238,7 +240,6 @@ static void shell(){
         uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
         uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
-        uart_printf(CMD_LSDEV  "\t\t: Print all the nodes and propperties parsed from dtb.\r\n");
         uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
         uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
         uart_printf(CMD_DUMP_PAGE "\t: Dump the frame array and free block lists\r\n");
@@ -246,6 +247,8 @@ static void shell(){
         uart_printf(CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
         uart_printf(CMD_DUMP_RQ "\t\t: Dump run queue\r\n");
         uart_printf(CMD_EXEC " <file> \t: Reallocate the file (img) and jumps to it.\r\n");
+        uart_printf(CMD_WRITE " <file> <str>\t: Write string to file, create if not exist, rewrite if exist\r\n");
+        uart_printf(CMD_READ " <file> <len>\t: Read len bytes from file, print as string\r\n");
       }
       else if(strcmp_(args[0], CMD_REBOOT) == 0){
         uart_printf("Rebooting...\r\n");
@@ -258,9 +261,6 @@ static void shell(){
       else if(strcmp_(args[0], CMD_CAT) == 0){
         if(args_cnt > 1)
           cpio_cat(args[1]);
-      }
-      else if(strcmp_(args[0], CMD_LSDEV) == 0){
-        // fdtb_parse(dtb_addr, 1, NULL);
       }
       else if(strcmp_(args[0], CMD_ALLOCATE_PAGE) == 0){
         if(args_cnt > 1){
@@ -322,6 +322,40 @@ static void shell(){
         }
         else
           uart_printf("Usage: " CMD_EXEC " <file>\r\n");
+      }
+      else if(strcmp_(args[0], CMD_WRITE) == 0){
+        if(args_cnt == 3){
+          file *fh = NULL;
+          int ret = vfs_open(args[1], O_CREAT, &fh);
+          if(ret == 0){
+            int wrote = vfs_write(fh, args[2], strlen_(args[2]));
+            uart_printf("shell(): wrote %d bytes\r\n", wrote);
+            vfs_close(fh);
+          }
+        }
+        else
+          uart_printf("Usage:" CMD_WRITE " <file> <str>: Write string to file, create if not exist, rewrite if exist\r\n");
+      }
+      else if(strcmp_(args[0], CMD_READ) == 0){
+        if(args_cnt == 3){
+          file *fh = NULL;
+          int len = 0;
+          sscanf_(args[2], "%d", &len);
+          char *buf = diy_malloc(len);
+          int ret = vfs_open(args[1], 0, &fh);
+          if(ret == 0){
+            int read = vfs_read(fh, buf, len);
+            uart_printf("shell(): read %d bytes:\r\n", read);
+            uart_printf("%s\r\n", buf);
+            vfs_close(fh);
+          }
+          diy_free(buf);
+        }
+        else
+          uart_printf("Usage:" CMD_READ " <file> <len>: Read len bytes from file, print as string\r\n");
+      }
+      else if(strcmp_(args[0], CMD_DUMP_VFS) == 0){
+        vfs_dump_root();
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);

@@ -9,6 +9,7 @@ extern "C" {
 #define TMPFS_MAX_PATH_LEN 255
 #define TMPFS_MAX_COMPONENT_NAME 32
 #define TMPFS_MAX_ENTRY 16
+#define TMPFS_MAX_FILE_SIZE 4096
 
 extern filesystem tmpfs;
 

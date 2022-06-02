@@ -11,10 +11,81 @@ vnode_operations tmpfs_vops = {.lookup=tmpfs_lookup, .create=tmpfs_create, .mkdi
 
 
 int tmpfs_write(file *file, const void *buf, size_t len){
-  return 1;
+
+  // Return on null pointers
+  if(file == NULL){
+    uart_printf("Error, tmpfs_write(), file=NULL\r\n");
+    return 1;
+  }
+  vnode *node = file->vnode;
+  if(node == NULL){
+    uart_printf("Error, tmpfs_write(), file->vnode=NULL, file=0x%lX\r\n", (uint64_t)file);
+    return 1;
+  }
+  vnode_comp *comp = node->comp;
+  if(node == NULL){
+    uart_printf("Error, tmpfs_write(), node->comp=NULL, file=0x%lX, node=0x%lX\r\n", (uint64_t)file, (uint64_t)node);
+    return 1;
+  }
+
+  // Return if file_node is not COMP_FILE
+  if(comp->type != COMP_FILE){
+    uart_printf("Error, tmpfs_write(), failed opening node_name=%s, node=0x%lX, type=%d, not file\r\n", 
+      comp->comp_name, (uint64_t)node, comp->type);
+    return 2;
+  }
+
+  // Reallocate new space if current size is not big enough
+  const size_t ideal_final_pos = file->f_pos + len;
+  if(ideal_final_pos > comp->len && comp->len < TMPFS_MAX_FILE_SIZE){
+    size_t new_len = ideal_final_pos + 512; // always allocate 512 bytes more
+    new_len = new_len > TMPFS_MAX_FILE_SIZE ? TMPFS_MAX_FILE_SIZE : new_len;  // truncate to TMPFS_MAX_FILE_SIZE
+    char *new_space = diy_malloc(sizeof(char) * new_len);
+    if(comp->len > 0){
+      memcpy_(new_space, comp->data, comp->len);
+      memset_(new_space+comp->len, 0, new_len - comp->len); // clear the rest
+      memset_(comp->data, 0, comp->len);                    // clear before free
+      diy_free(comp->data);
+    }
+    comp->len = new_len;
+    comp->data = new_space;
+  }
+
+  const size_t wrtie_able = ideal_final_pos >= TMPFS_MAX_FILE_SIZE ? (TMPFS_MAX_FILE_SIZE-file->f_pos) : len;
+  memcpy_(comp->data + file->f_pos, buf, wrtie_able);
+  file->f_pos += wrtie_able;
+  return wrtie_able;
 }
 int tmpfs_read(file *file, void *buf, size_t len){
-  return 1;
+
+  // Return on null pointers
+  if(file == NULL){
+    uart_printf("Error, tmpfs_read(), file=NULL\r\n");
+    return 1;
+  }
+  vnode *node = file->vnode;
+  if(node == NULL){
+    uart_printf("Error, tmpfs_read(), file->vnode=NULL, file=0x%lX\r\n", (uint64_t)file);
+    return 1;
+  }
+  vnode_comp *comp = node->comp;
+  if(node == NULL){
+    uart_printf("Error, tmpfs_read(), node->comp=NULL, file=0x%lX, node=0x%lX\r\n", (uint64_t)file, (uint64_t)node);
+    return 1;
+  }
+
+  // Return if file_node is not COMP_FILE
+  if(comp->type != COMP_FILE){
+    uart_printf("Error, tmpfs_read(), failed opening node_name=%s, node=0x%lX, type=%d, not file\r\n", 
+      comp->comp_name, (uint64_t)node, comp->type);
+    return 2;
+  }
+
+  const size_t ideal_final_pos = file->f_pos + len;
+  const size_t read_able = ideal_final_pos >= comp->len ? (comp->len - file->f_pos) : len;
+  memcpy_(buf, comp->data, read_able);
+  file->f_pos += read_able;
+  return read_able;
 }
 int tmpfs_open(vnode *file_node, file **file_handle){
 

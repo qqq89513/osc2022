@@ -139,27 +139,6 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount->fs = &tmpfs;
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
-    vnode *node = NULL;
-    file *fh = NULL;
-    lookup_priv("/file1", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
-    lookup_priv("/file2", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
-    lookup_priv("/dir0", &root_vnode, &node, 1);
-    vfs_mkdir("/dir0/dir0_0"); // equlivalent: lookup_priv("/dir0/dir0_0", &root_vnode, &node, 1);
-    vfs_mkdir("/file1/123");   // failed, cannot make dir under file
-    lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
-    lookup_priv("/dir1/dir1_0/more_inner_dir/123/efgh", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
-    lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); // not created cuz abcd is file, but lookup
-    vfs_open("/file1", 0, &fh);
-    vfs_open("/file3", O_CREAT, &fh);
-    vfs_open("/dir4/dir4_0/file1.txt", O_CREAT, &fh);
-    vfs_open("/dir1/dir1_0/more_inner_dir/123", 0, &fh);  // failed since 123 is folder
-    vfs_open("/dir1/dir1_0/more_inner_dir/123/abcd", 0, &fh);
-    vfs_close(fh);
-    vfs_dump_root();
-    if(vfs_lookup("/dir1/dir1_0/more_inner_dir/123/abcd", &node) == 0){
-      uart_printf("Found!, node=0x%lX\r\n", (uint64_t)node);
-    }else
-      uart_printf("Not found!, node=0x%lX\r\n", (uint64_t)node);
     return ret;
   }
   else{
@@ -222,14 +201,14 @@ int vfs_close(file *file){
 int vfs_write(file *file, void *buf, size_t len){
   // 1. write len byte from buf to the opened file.
   // 2. return written size or error code if an error occurs.
-  return 1;
+  return file->f_ops->write(file, buf, len);
 }
 
 int vfs_read(file *file, void *buf, size_t len){
   // 1. read min(len, readable size) byte to buf from the opened file.
   // 2. block if nothing to read for FIFO type
   // 2. return read size or error code if an error occurs.
-  return 1;
+  return file->f_ops->read(file, buf, len);
 }
 
 int vfs_mkdir(char *pathname){
