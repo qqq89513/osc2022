@@ -15,7 +15,7 @@ int strcmp_(const char* src1,const char* src2);
 char *strtok_(char *str, char *delimiter);
 void memcpy_(void* dest, const void* src, size_t len);
 void *memset_(void *str, int c, size_t len);
-
+int str_spilt(char** str_arr, char* str, char* deli);
 
 #ifdef __cplusplus
 }

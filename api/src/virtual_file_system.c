@@ -7,12 +7,19 @@
 vnode root_vnode;
 mount root_mount = {.fs=NULL, .root=&root_vnode};
 
-static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found);
+static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int create);
 static char *skip_first_comp(char *pathname);
 static int first_component(char *pathname, char *comp_name);
 
-// Return 0 on found, 1 not found, 2 or 3 on error. node_found will be set to as deep as possible
-static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found){
+/** Search pathname under dir_node recursively. Return 0 on found. Create if requested.
+ * @param pathname: relative path to dir_node, if dir_node is root_vnode, than this is abs path
+ * @param dir_node: Directory node to look under
+ * @param node_found: Output of this function. The node pointer if file/dir specified with pathname exists.
+ *  If not exist, node_found is set to the last node that match partial pathname.
+ * @param create: Set to 1 to create entry if the path not exist, 0 to do nothing. The created node is set to COMP_DIR, can be changed after
+ * @return 0 on found, non-0 otherwise. If create==1 and not found, return create()
+*/
+static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int create){
   char *rest_path = NULL;
   char comp_name[TMPFS_MAX_COMPONENT_NAME];
   rest_path = skip_first_comp(pathname);
@@ -31,7 +38,7 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found){
 
     // More to lookup and can lookup deeper
     if     (rest_path[0] != '\0' && dir_node->comp->type == COMP_DIR)
-      return lookup_priv(rest_path, dir_node, node_found);
+      return lookup_priv(rest_path, dir_node, node_found, create);
 
     // More to lookup and cannot lookup deeper, return not found
     else if(rest_path[0] != '\0' && dir_node->comp->type == COMP_FILE)
@@ -47,6 +54,32 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found){
         (uint64_t)dir_node, dir_node->comp->comp_name, dir_node->comp->type);
       return 3;
     }
+  }
+
+  // Create entry iteratively if not found
+  // Should be refactored, too many return point in this function. but I'm lazy
+  else if(create == 1){
+    char *rest_comps[VFS_MAX_DEPTH];
+    char path_copy[TMPFS_MAX_PATH_LEN];
+    int comp_count = 0;
+    int mkdir_ret = 0;
+    // uart_printf("Debug, lookup_priv(), path=%s, rest=%s, comp=%s\r\n", pathname, rest_path, comp_name);
+    // copy string since rest_path is from pathname, where pathname should not be changed
+    strcpy_(path_copy, pathname);
+    comp_count = str_spilt(rest_comps, path_copy, "/");
+    for(int i=0; i<comp_count; i++){
+      if(rest_comps[i][0] == '\0') continue; // skip NULL strings
+      // uart_printf("Debug, lookup_priv(), create, i=%d, dir=0x%lX, %s\r\n", i, (uint64_t)dir_node, rest_comps[i]);
+      mkdir_ret = dir_node->v_ops->mkdir(dir_node, node_found, rest_comps[i]);
+      if(mkdir_ret == 0){
+        dir_node = *node_found;
+      }
+      else{
+        uart_printf("Error, lookup_priv(), failed to create(), %s, rest_comps[%d]=%s\r\n", path_copy, i, rest_comps[i]);
+        return mkdir_ret;
+      }
+    }
+    return 0;
   }
 
   // comp_name not found under dir_node
@@ -107,22 +140,16 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
     vnode *node = NULL;
-    vnode *dirnode = NULL;
-    tmpfs_create(&root_vnode, &node, "file1"); node->comp->type = COMP_FILE;
-    tmpfs_create(&root_vnode, &node, "file2"); node->comp->type = COMP_FILE;
-    tmpfs_create(&root_vnode, &node, "dir0"); node->comp->type = COMP_DIR;
-    tmpfs_create(&root_vnode, &node, "dir8"); node->comp->type = COMP_DIR;
-    dirnode = node;
-    tmpfs_create(dirnode, &node, "under8_file0"); node->comp->type = COMP_FILE;
-    tmpfs_create(dirnode, &node, "under8_dir0"); node->comp->type = COMP_DIR;
-    tmpfs_create(dirnode, &node, "under8_dir1"); node->comp->type = COMP_DIR;
-    tmpfs_create(dirnode, &node, "under8_dir2"); node->comp->type = COMP_DIR;
-    dirnode = node;
-    tmpfs_create(dirnode, &node, "more_inner_dir0"); node->comp->type = COMP_DIR;
-    tmpfs_create(dirnode, &node, "more_inner_dir1"); node->comp->type = COMP_DIR;
-    tmpfs_create(dirnode, &node, "more_inner_file.txt"); node->comp->type = COMP_FILE;
+    lookup_priv("/file1", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
+    lookup_priv("/file2", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
+    lookup_priv("/dir0", &root_vnode, &node, 1);
+    vfs_mkdir("/dir0/dir0_0"); // equlivalent: lookup_priv("/dir0/dir0_0", &root_vnode, &node, 1);
+    vfs_mkdir("/file1/123");   // failed, cannot make dir under file
+    lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
+    lookup_priv("/dir1/dir1_0/more_inner_dir/123/efgh", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
+    lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); // not created cuz abcd is file, but lookup
     vfs_dump_root();
-    if(vfs_lookup("/dir8/under8_dir2/more_inner_file.txt", &node) == 0){
+    if(vfs_lookup("/dir1/dir1_0/more_inner_dir/123/abcd", &node) == 0){
       uart_printf("Found!, node=0x%lX\r\n", (uint64_t)node);
     }else
       uart_printf("Not found!, node=0x%lX\r\n", (uint64_t)node);
@@ -141,7 +168,7 @@ int vfs_lookup(char *pathname, vnode **target){
     return 0;
   }
   else{
-    return lookup_priv(pathname, &root_vnode, target);
+    return lookup_priv(pathname, &root_vnode, target, 0);
   }
 }
 
@@ -173,6 +200,23 @@ int vfs_read(file *file, void *buf, size_t len){
   return 1;
 }
 
+int vfs_mkdir(char *pathname){
+  vnode *node = NULL;
+  if(vfs_lookup(pathname, &node) == 0){
+    uart_printf("Error, vfs_mkdir(), cannot make directory, %s already exist\r\n", pathname);
+    return 1;
+  }
+  else{
+    vnode *node = NULL;
+    int ret = lookup_priv(pathname, &root_vnode, &node, 1);
+    if(ret != 0){
+      uart_printf("Error, vfs_mkdir(), failed to create %s", pathname);
+      uart_printf(", last entry 0x%lX, %s, type=%d, len=%lu\r\n", 
+        (uint64_t)node, node->comp->comp_name, node->comp->type, node->comp->len);
+    }
+    return ret;
+  }
+}
 
 void vfs_dump_under(vnode *node, int depth){
   if(node->comp->type == COMP_DIR){

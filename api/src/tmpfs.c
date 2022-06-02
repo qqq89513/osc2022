@@ -38,8 +38,24 @@ int tmpfs_setup_mount(struct filesystem *fs, mount *mount){
   return 0;
 }
 
-int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name){
-  return 1;
+int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name){  
+  
+  // Return if dir_node is not COMP_DIR
+  if(dir_node->comp->type != COMP_DIR){
+    uart_printf("Error, tmpfs_mkdir(), failed creating %s, dir_node_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+      component_name, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
+    return 2;
+  }
+
+  if(tmpfs_create(dir_node, target, component_name) == 0){
+    (*target)->comp->type = COMP_DIR;
+    return 0;
+  }
+  else{
+    uart_printf("Error, tmpfs_mkdir(), failed creating %s, dir_node_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+      component_name, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
+    return 1;
+  }
 }
 int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name){
 
@@ -71,7 +87,8 @@ int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name){
   // Create vnode, note that type is not specified here
   *target = diy_malloc(sizeof(vnode));
   (*target)->comp = diy_malloc(sizeof(vnode_comp));
-  (*target)->comp->comp_name = (char*)component_name;
+  (*target)->comp->comp_name = diy_malloc(strlen_(component_name));
+  strcpy_((*target)->comp->comp_name, component_name);
   (*target)->comp->data = NULL;
   (*target)->comp->len = 0;
   

@@ -128,3 +128,15 @@ void *memset_(void *str, int c, size_t len){
     *++ptr = c;
   return str;
 }
+
+int str_spilt(char** str_arr, char* str, char* deli){
+  int count = 0;
+  // Spilt str by specified delimeter
+  str_arr[0] = strtok_(str, deli);
+  count = 0;
+  while(str_arr[count] != NULL){
+    count++;
+    str_arr[count] = strtok_(NULL, deli);
+  }
+  return count;
+}
