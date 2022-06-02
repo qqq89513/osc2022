@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stdint.h>
 #include "diy_malloc.h"
+#include "virtual_file_system.h"
 
 #define DEFAULT_THREAD_SIZE (PAGE_SIZE*4) // 4kB, this includes the size of a stack and the thread's TCB
 
@@ -49,6 +50,7 @@ typedef struct thread_t {
   enum task_state state;
   enum task_exeception_level mode;
   void *target_func;
+  file *fd_table[VFS_PROCESS_MAX_OPEN_FILE];  // should be zeroed out on thread_create
   struct thread_t *next;
 } thread_t;
 
@@ -63,6 +65,7 @@ void exited_ll_dump();
 void exit_call_by_syscall_only();
 int kill_call_by_syscall_only(int pid);
 void thread_go_to_el0();
+int thread_get_idle_fd(thread_t *thd);
 
 #ifdef __cplusplus
 }

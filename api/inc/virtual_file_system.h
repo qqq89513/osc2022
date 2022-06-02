@@ -9,6 +9,7 @@ extern "C" {
 #include <stddef.h>
 
 #define VFS_MAX_DEPTH 64
+#define VFS_PROCESS_MAX_OPEN_FILE 16
 #define O_CREAT 0100 // flag for vfs_open()
 
 typedef enum comp_type{

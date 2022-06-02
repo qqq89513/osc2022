@@ -3,6 +3,8 @@
 #include "sys_reg.h"
 #include "uart.h"
 #include "timer.h"
+#include "diy_string.h"
+#include "virtual_file_system.h"
 
 #ifdef THREADS  // pass -DTHREADS to compiler for lab5
 
@@ -188,6 +190,8 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   if(thd_parent != NULL)   thd_new->ppid = 0;               // Thread created from other thread
   else                     thd_new->ppid = thd_parent->pid; // Thread created from main() from kernel
 
+  memset_(thd_new->fd_table, 0, sizeof(thd_new->fd_table)); // init file table
+
 #ifdef VIRTUAL_MEM
   thd_new->ttbr0_el1 = read_sysreg(ttbr0_el1);
 #endif
@@ -268,6 +272,14 @@ int kill_call_by_syscall_only(int pid){
   exited_ll_insert_head(thd);
 
   return 0;  
+}
+
+int thread_get_idle_fd(thread_t *thd){
+  for(int i=0; i<VFS_PROCESS_MAX_OPEN_FILE; i++){
+    if(thd->fd_table[i] == NULL)
+      return i;
+  }
+  return -1;
 }
 
 #endif

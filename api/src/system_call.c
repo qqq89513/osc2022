@@ -8,6 +8,7 @@
 #include "uart.h"
 #include "general.h"
 #include "mmu.h"
+#include "virtual_file_system.h"
 
 #ifdef THREADS  // pass -DTHREADS to compiler for lab5
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
@@ -19,6 +20,13 @@
 #define SYSCALL_NUM_EXIT       5
 #define SYSCALL_NUM_MBOX_CALL  6
 #define SYSCALL_NUM_KILL       7
+#define SYSCALL_NUM_OPEN       11
+#define SYSCALL_NUM_CLOSE      12
+#define SYSCALL_NUM_WRITE      13
+#define SYSCALL_NUM_READ       14
+#define SYSCALL_NUM_MKDIR      15
+#define SYSCALL_NUM_MOUNT      16
+#define SYSCALL_NUM_CHDIR      17
 
 extern void kid_thread_return_fork();   // defined in vect_table_and_execption_handler.S
 
@@ -31,6 +39,13 @@ static int    priv_fork(trap_frame *tf_mom);
 static void   priv_exit(int status);
 static int    priv_mbox_call(unsigned char ch, unsigned int *mbox);
 static int    priv_kill(int pid);
+static int    priv_open(const char *pathname, int flags);
+static int    priv_close(int fd);
+static size_t priv_write(int fd, const void *buf, size_t count);
+static size_t priv_read(int fd, void *buf, size_t count);
+static int    priv_mkdir(const char *pathname, unsigned mode);
+static int    priv_mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data);
+static int    priv_chdir(const char *path);
 
 
 /**
@@ -48,30 +63,24 @@ void system_call(trap_frame *tf){
   uint64_t num = tf->x8;
   thread_t *thd = NULL;
   switch(num){
-    case SYSCALL_NUM_GETPID:
-      tf->x0 = priv_getpid();
+    case SYSCALL_NUM_GETPID:      tf->x0 = priv_getpid();                                                 break;
+    case SYSCALL_NUM_UART_READ:   tf->x0 = priv_uart_read((char*)tf->x0, (size_t)tf->x1);                 break;
+    case SYSCALL_NUM_UART_WRITE:  tf->x0 = priv_uart_write((char*)tf->x0, (size_t)tf->x1);                break;
+    case SYSCALL_NUM_EXEC:        tf->x0 = priv_exec((char*)tf->x0, (char **)tf->x1, tf);                 break;
+    case SYSCALL_NUM_FORK:        tf->x0 = priv_fork(tf);                                                 break;
+    case SYSCALL_NUM_EXIT:        priv_exit((int)tf->x0);                                                 break;
+    case SYSCALL_NUM_MBOX_CALL:   tf->x0 = priv_mbox_call((unsigned char)tf->x0, (unsigned int*)tf->x1);  break;
+    case SYSCALL_NUM_KILL:        tf->x0 = priv_kill(tf->x0);                                             break;
+    case SYSCALL_NUM_OPEN:        tf->x0 = priv_open((const char*)tf->x0, tf->x1);                        break;
+    case SYSCALL_NUM_CLOSE:       tf->x0 = priv_close(tf->x0);                                            break;
+    case SYSCALL_NUM_WRITE:       tf->x0 = priv_write(tf->x0, (const void*)tf->x1, tf->x2);               break;
+    case SYSCALL_NUM_READ:        tf->x0 = priv_read(tf->x0, (void*)tf->x1, tf->x2);                      break;
+    case SYSCALL_NUM_MKDIR:       tf->x0 = priv_mkdir((const char*)tf->x0, tf->x1);                       break;
+    case SYSCALL_NUM_MOUNT:       
+      tf->x0 = priv_mount((const char*)tf->x0, (const char*)tf->x1, (const char*)tf->x2, tf->x3, (const void*)tf->x4);
       break;
-    case SYSCALL_NUM_UART_READ:
-      tf->x0 = priv_uart_read((char*)tf->x0, (size_t)tf->x1);
-      break;
-    case SYSCALL_NUM_UART_WRITE:
-      tf->x0 = priv_uart_write((char*)tf->x0, (size_t)tf->x1);
-      break;
-    case SYSCALL_NUM_EXEC:
-      tf->x0 = priv_exec((char*)tf->x0, (char **)tf->x1, tf);
-      break;
-    case SYSCALL_NUM_FORK:
-      tf->x0 = priv_fork(tf);
-      break;
-    case SYSCALL_NUM_EXIT:
-      priv_exit((int)tf->x0);
-      break;
-    case SYSCALL_NUM_MBOX_CALL:
-      tf->x0 = priv_mbox_call((unsigned char)tf->x0, (unsigned int*)tf->x1);
-      break;
-    case SYSCALL_NUM_KILL:
-      tf->x0 = priv_kill(tf->x0);
-      break;
+    case SYSCALL_NUM_CHDIR:       tf->x0 = priv_chdir((const char*)tf->x0);                               break;
+
     default:
       thd = thread_get_current();
       uart_printf("Exeception, unimplemented system call, num=%lu, pid=%d, elr_el1=%lX\r\n", num, thd->pid, thd->elr_el1);
@@ -353,4 +362,140 @@ int           sysc_kill(int pid){
 static int    priv_kill(int pid){
   return kill_call_by_syscall_only(pid);
 }
+
+
+// Virtual File System, system call -------------------------------------------------------
+
+// Return file descriptor
+int           sysc_open(const char *pathname, int flags){
+  write_gen_reg(x8, SYSCALL_NUM_OPEN);
+  write_gen_reg(x1, flags);     // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, pathname);  // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static int    priv_open(const char *pathname, int flags){
+  thread_t *thd = thread_get_current();
+  int fd = thread_get_idle_fd(thd);
+  if(fd < 0){
+    uart_printf("Error, priv_open(), cannot open more file for pid=%d\r\n", thd->pid);
+    return -1;
+  }
+
+  file *fh = NULL;
+  int ret = vfs_open((char*)pathname, flags, &fh);
+  if(ret == 0){
+    thd->fd_table[fd] = fh;
+    return fd;
+  }
+  else
+    return -1;
+}
+
+int           sysc_close(int fd){
+  write_gen_reg(x8, SYSCALL_NUM_CLOSE);
+  write_gen_reg(x0, fd);
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static int    priv_close(int fd){
+  thread_t *thd = thread_get_current();
+  file *fh = thd->fd_table[fd];
+  if(fh == NULL){
+    uart_printf("Error, priv_close(), unrecognized fd=%d, pid=%d\r\n", fd, thd->pid);
+    return 1;
+  }
+  int ret = vfs_close(fh);
+  if(ret == 0)
+    thd->fd_table[fd] = NULL; // fd can be reused
+  else
+    uart_printf("Error, priv_close(), failed on vfs_close(), fd=%d, fh=0x%lX, pid=%d, ret=%d\r\n",
+      fd, (uint64_t)fh, thd->pid, ret);
+  return ret;
+}
+
+// Return size wrote or error code
+size_t        sysc_write(int fd, const void *buf, size_t count){
+  write_gen_reg(x8, SYSCALL_NUM_WRITE);
+  write_gen_reg(x2, count);
+  write_gen_reg(x1, buf);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, fd);   // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  size_t ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static size_t priv_write(int fd, const void *buf, size_t count){
+  thread_t *thd = thread_get_current();
+  file *fh = thd->fd_table[fd];
+  if(fh == NULL){
+    uart_printf("Error, priv_write(), unrecognized fd=%d, pid=%d\r\n", fd, thd->pid);
+    return 0;
+  }
+
+  return vfs_write(fh, (void*)buf, count);
+}
+
+// Return size read or error code
+size_t        sysc_read(int fd, void *buf, size_t count){
+  write_gen_reg(x8, SYSCALL_NUM_READ);
+  write_gen_reg(x2, count);
+  write_gen_reg(x1, buf);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, fd);   // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  size_t ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static size_t priv_read(int fd, void *buf, size_t count){
+  thread_t *thd = thread_get_current();
+  file *fh = thd->fd_table[fd];
+  if(fh == NULL){
+    uart_printf("Error, priv_read(), unrecognized fd=%d, pid=%d\r\n", fd, thd->pid);
+    return 0;
+  }
+
+  return vfs_read(fh, (void*)buf, count);
+}
+
+// you can ignore mode, since there is no access control
+int           sysc_mkdir(const char *pathname, unsigned mode){
+  write_gen_reg(x8, SYSCALL_NUM_MKDIR);
+  write_gen_reg(x1, mode);      // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, pathname);  // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static int    priv_mkdir(const char *pathname, unsigned mode){
+  return vfs_mkdir((char*)pathname);
+}
+
+// arguments other than target (where to mount) and filesystem (fs name) are ignored
+int           sysc_mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data){
+  write_gen_reg(x8, SYSCALL_NUM_MOUNT);
+  write_gen_reg(x4, data);
+  write_gen_reg(x3, flags);
+  write_gen_reg(x2, filesystem);
+  write_gen_reg(x1, target);  // write_gen_reg() seems to use x0 as buffer
+  write_gen_reg(x0, src);     // so write to x0 should be the last one performed
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static int    priv_mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data){
+  return 1;
+}
+
+int           sysc_chdir(const char *path){
+  write_gen_reg(x8, SYSCALL_NUM_CHDIR);
+  write_gen_reg(x0, path);
+  asm volatile("svc 0");
+  int ret_val = read_gen_reg(x0);
+  return ret_val;
+}
+static int    priv_chdir(const char *path){
+  return 1;
+}
+
 #endif

@@ -17,7 +17,7 @@
 #define MACHINE_NAME "rpi5-baremetal-lab7$ "
 #define CMD_HELP     "help"
 #define CMD_REBOOT   "reboot"
-#define CMD_LS       "ls"
+#define CMD_LS_CPIO  "ls_cpio"
 #define CMD_CAT      "cat"
 #define CMD_ALLOCATE_PAGE "ap"
 #define CMD_FREE_PAGE     "fp"
@@ -29,7 +29,8 @@
 #define CMD_EXEC          "exec"
 #define CMD_WRITE         "write"
 #define CMD_READ          "read"
-#define CMD_DUMP_VFS      "dump_vfs"
+#define CMD_MKDIR         "mkdir"
+#define CMD_LS            "ls"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -238,7 +239,7 @@ static void shell(){
       if     (strcmp_(args[0], CMD_HELP) == 0){
         uart_printf(CMD_HELP   "\t\t: print this help menu\r\n");
         uart_printf(CMD_REBOOT "\t\t: reboot the device\r\n");
-        uart_printf(CMD_LS     "\t\t: List files and dirs\r\n");
+        uart_printf(CMD_LS_CPIO "\t\t: List files and dirs on initramfs\r\n");
         uart_printf(CMD_CAT    "\t\t: Print file content\r\n");
         uart_printf(CMD_ALLOCATE_PAGE " <page count>\t: Allocate <page count> from heap.\r\n");
         uart_printf(CMD_FREE_PAGE " <page index>\t: Release <page index>.\r\n");
@@ -247,15 +248,18 @@ static void shell(){
         uart_printf(CMD_FREE " <addr>\t: Free memory, <addr> in hex without 0x\r\n");
         uart_printf(CMD_DUMP_RQ "\t\t: Dump run queue\r\n");
         uart_printf(CMD_EXEC " <file> \t: Reallocate the file (img) and jumps to it.\r\n");
-        uart_printf(CMD_WRITE " <file> <str>\t: Write string to file, create if not exist, rewrite if exist\r\n");
-        uart_printf(CMD_READ " <file> <len>\t: Read len bytes from file, print as string\r\n");
+        uart_printf(CMD_LS "\t\t: VFS: List entries recursively\r\n");
+        uart_printf(CMD_MKDIR " <dir_path>\t: VFS: Create directory\r\n");
+        uart_printf(CMD_WRITE " <file> <str>\t: VFS: Write string to file, create if not exist, rewrite if exist\r\n");
+        uart_printf(CMD_READ " <file> <len>\t: VFS: Read len bytes from file, print as string\r\n");
+        
       }
       else if(strcmp_(args[0], CMD_REBOOT) == 0){
         uart_printf("Rebooting...\r\n");
         reset(1000);
         while(1);
       }
-      else if(strcmp_(args[0], CMD_LS) == 0){
+      else if(strcmp_(args[0], CMD_LS_CPIO) == 0){
         cpio_ls();
       }
       else if(strcmp_(args[0], CMD_CAT) == 0){
@@ -323,14 +327,22 @@ static void shell(){
         else
           uart_printf("Usage: " CMD_EXEC " <file>\r\n");
       }
+      else if(strcmp_(args[0], CMD_MKDIR) == 0){
+        if(args_cnt == 2){
+          int ret = sysc_mkdir(args[1], 0);
+          if(ret != 0)
+            uart_printf("shell(): Failed to mkdir: %s\r\n", args[1]);
+        }
+        else
+          uart_printf("Usage:" CMD_MKDIR " <dir_path>\t: VFS: Create directory\r\n");
+      }
       else if(strcmp_(args[0], CMD_WRITE) == 0){
         if(args_cnt == 3){
-          file *fh = NULL;
-          int ret = vfs_open(args[1], O_CREAT, &fh);
-          if(ret == 0){
-            int wrote = vfs_write(fh, args[2], strlen_(args[2]));
+          int fd = sysc_open(args[1], O_CREAT);
+          if(fd >= 0){
+            int wrote = sysc_write(fd, args[2], strlen_(args[2]));
             uart_printf("shell(): wrote %d bytes\r\n", wrote);
-            vfs_close(fh);
+            sysc_close(fd);
           }
         }
         else
@@ -338,23 +350,22 @@ static void shell(){
       }
       else if(strcmp_(args[0], CMD_READ) == 0){
         if(args_cnt == 3){
-          file *fh = NULL;
           int len = 0;
           sscanf_(args[2], "%d", &len);
           char *buf = diy_malloc(len);
-          int ret = vfs_open(args[1], 0, &fh);
-          if(ret == 0){
-            int read = vfs_read(fh, buf, len);
+          int fd = sysc_open(args[1], 0);
+          if(fd >= 0){
+            int read = sysc_read(fd, buf, len);
             uart_printf("shell(): read %d bytes:\r\n", read);
             uart_printf("%s\r\n", buf);
-            vfs_close(fh);
+            sysc_close(fd);
           }
           diy_free(buf);
         }
         else
           uart_printf("Usage:" CMD_READ " <file> <len>: Read len bytes from file, print as string\r\n");
       }
-      else if(strcmp_(args[0], CMD_DUMP_VFS) == 0){
+      else if(strcmp_(args[0], CMD_LS) == 0){
         vfs_dump_root();
       }
       else
