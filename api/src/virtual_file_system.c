@@ -140,6 +140,7 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
     vnode *node = NULL;
+    file *fh = NULL;
     lookup_priv("/file1", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
     lookup_priv("/file2", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
     lookup_priv("/dir0", &root_vnode, &node, 1);
@@ -148,6 +149,11 @@ int vfs_mount(char *pathname, char *fs_name){
     lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
     lookup_priv("/dir1/dir1_0/more_inner_dir/123/efgh", &root_vnode, &node, 1); node->comp->type = COMP_FILE;
     lookup_priv("/dir1/dir1_0/more_inner_dir/123/abcd", &root_vnode, &node, 1); // not created cuz abcd is file, but lookup
+    vfs_open("/file1", 0, &fh);
+    vfs_open("/file3", O_CREAT, &fh);
+    vfs_open("/dir4/dir4_0/file1.txt", O_CREAT, &fh);
+    vfs_open("/dir1/dir1_0/more_inner_dir/123", 0, &fh);  // failed since 123 is folder
+    vfs_open("/dir1/dir1_0/more_inner_dir/123/abcd", 0, &fh);
     vfs_dump_root();
     if(vfs_lookup("/dir1/dir1_0/more_inner_dir/123/abcd", &node) == 0){
       uart_printf("Found!, node=0x%lX\r\n", (uint64_t)node);
@@ -172,13 +178,38 @@ int vfs_lookup(char *pathname, vnode **target){
   }
 }
 
-int vfs_open(char *pathname, int flags, file **target){
-  // 1. Lookup pathname
-  // 2. Create a new file handle for this vnode if found.
-  // 3. Create a new file if O_CREAT is specified in flags and vnode not found
-  // lookup error code shows if file exist or not or other error occurs
-  // 4. Return error code if fails
-  return 1;
+int vfs_open(char *pathname, int flags, file **file_handle){
+  vnode *node = NULL;
+  int ret = 0;
+
+  // Lookup pathname
+  ret = vfs_lookup(pathname, &node);
+  
+  // Create a new file if vnode not found and O_CREAT
+  if(ret != 0 && (flags & O_CREAT)){
+    ret = lookup_priv(pathname, &root_vnode, &node, 1); // create via lookup_priv()
+    if(ret == 0) node->comp->type = COMP_FILE;
+    else{
+      uart_printf("Exception, vfs_open(), failed to create %s, ret=%d\r\n", pathname, ret);
+      return ret;
+    }
+  }
+  else if(ret != 0){
+    uart_printf("Error, vfs_open(), no such file %s\r\n", pathname);
+    return ret;
+  }
+
+  // Open file through fops of this node
+  ret = node->f_ops->open(node, file_handle);
+  if(ret == 0)
+    (*file_handle)->flags = flags;
+  else{
+    uart_printf("Error, vfs_open(), node->f_ops->open() failed, ret=%d", ret);
+    uart_printf(", path=%s", pathname);
+    uart_printf(", node=0x%lX, %s, type=%d, len=%lu\r\n", 
+      (uint64_t)node, node->comp->comp_name, node->comp->type, node->comp->len);
+  }
+  return ret;
 }
 
 int vfs_close(file *file){

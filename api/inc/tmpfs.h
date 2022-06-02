@@ -15,13 +15,13 @@ extern filesystem tmpfs;
 // fops
 int tmpfs_write(file *file, const void *buf, size_t len);
 int tmpfs_read(file *file, void *buf, size_t len);
-int tmpfs_open(const char *pathname, file **target);
+int tmpfs_open(vnode* file_node, file** target);
 int tmpfs_close(file *file);
 
 // vops
 int tmpfs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
 int tmpfs_create(vnode *dir_node, vnode **target, const char *component_name);
-int tmpfs_lookup(vnode* dir_node, vnode **target, const char* component_name);
+int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name);
 
 int tmpfs_setup_mount(struct filesystem *fs, mount *mount);
 

@@ -16,8 +16,21 @@ int tmpfs_write(file *file, const void *buf, size_t len){
 int tmpfs_read(file *file, void *buf, size_t len){
   return 1;
 }
-int tmpfs_open(const char *pathname, file **target){
-  return 1;
+int tmpfs_open(vnode *file_node, file **file_handle){
+
+  // Return if file_node is not COMP_FILE
+  if(file_node->comp->type != COMP_FILE){
+    uart_printf("Error, tmpfs_open(), failed opening file_node_name=%s, file_node=0x%lX, type=%d, not file\r\n", 
+      file_node->comp->comp_name, (uint64_t)file_node, file_node->comp->type);
+    return 2;
+  }
+
+  // Create a new file handle for this vnode
+  *file_handle = diy_malloc(sizeof(file));
+  (*file_handle)->f_ops = file_node->f_ops;
+  (*file_handle)->f_pos = 0;
+  (*file_handle)->vnode = file_node;
+  return 0;
 }
 int tmpfs_close(file *file){
   return 1;

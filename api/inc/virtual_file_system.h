@@ -54,7 +54,7 @@ typedef struct filesystem{
 typedef struct file_operations{
   int  (*write)  (file *file, const void *buf, size_t len);
   int  (*read)   (file *file, void *buf, size_t len);
-  int  (*open)   (const char *pathname, file **target);
+  int  (*open)   (vnode *file_node, struct file **target);
   int  (*close)  (file *file);
   long (*lseek64)(file *file, long offset, int whence);
 } file_operations;
