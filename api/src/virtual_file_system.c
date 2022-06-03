@@ -28,6 +28,10 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int 
   rest_path = skip_first_comp(pathname);
   first_component(pathname, comp_name);
 
+  // Cross mount point, don't know if this is the right way to do it
+  if(dir_node->mount != NULL)
+    return lookup_priv(pathname, dir_node->mount->root, node_found, create);
+
   // Return if dir_node is not COMP_DIR
   if(dir_node->comp->type != COMP_DIR){
     uart_printf("Error, lookup_priv(), failed, pathname=%s, search_under_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
@@ -191,7 +195,7 @@ int register_filesystem(filesystem *fs){
   return -1;
 }
 
-int vfs_mount(char *pathname, char *fs_name){
+int vfs_mount(char *pathname, const char *fs_name){
   vnode *mount_at_node = NULL;
 
   // Search for the mount point, return if not found
@@ -203,11 +207,9 @@ int vfs_mount(char *pathname, char *fs_name){
   if(strcmp_(fs_name, tmpfs.name) == 0){
     mount_at_node->mount = diy_malloc(sizeof(mount));
     mount_at_node->mount->fs = &tmpfs;
-    mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
-    char abs_path[255];
-    to_abs_path(abs_path, "/hello/", "text/../../../lr/../hello2/./bull/da/disapper/../apper");
-    uart_printf("abs_path=%s\r\n", abs_path);
+    uart_printf("Debug, vfs_mount(), path=%s, mount_at_node=%p, root_vnode=%p, mount_to=%p\r\n", pathname, mount_at_node, &root_vnode, root_vnode.mount->root);
+
     return ret;
   }
   else{
@@ -299,7 +301,9 @@ int vfs_mkdir(char *pathname){
 }
 
 void vfs_dump_under(vnode *node, int depth){
-  if(node->comp->type == COMP_DIR){
+  if(node->mount != NULL)
+    vfs_dump_under(node->mount->root, depth);
+  else if(node->comp->type == COMP_DIR){
     vnode *entry = NULL;
     for(size_t i=0; i<node->comp->len; i++){
       entry = node->comp->entries[i];

@@ -493,7 +493,12 @@ int           sysc_mount(const char *src, const char *target, const char *filesy
   return ret_val;
 }
 static int    priv_mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data){
-  return 1;
+  thread_t *thd = thread_get_current();
+  // Translate to absolute path
+  char abs_path[TMPFS_MAX_PATH_LEN];
+  abs_path[0] = '\0';
+  to_abs_path(abs_path, thd->cwd, target);
+  return vfs_mount(abs_path, filesystem);
 }
 
 int           sysc_chdir(const char *path){

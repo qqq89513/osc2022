@@ -32,6 +32,7 @@
 #define CMD_MKDIR         "mkdir"
 #define CMD_LS            "ls"
 #define CMD_CD            "cd"
+#define CMD_MOUNT         "mount"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -254,6 +255,7 @@ static void shell(){
         uart_printf(CMD_WRITE " <file> <str>\t: VFS: Write string to file, create if not exist, rewrite if exist\r\n");
         uart_printf(CMD_READ " <file> <len>\t: VFS: Read len bytes from file, print as string\r\n");
         uart_printf(CMD_CD       " <path>\t\t: VFS: Change directory\r\n");
+        uart_printf(CMD_MOUNT " <path> <fs>\t: VFS: Mount specific file system on path\r\n");
         
       }
       else if(strcmp_(args[0], CMD_REBOOT) == 0){
@@ -375,6 +377,12 @@ static void shell(){
           sysc_chdir(args[1]);
         else
           uart_printf("Usage:" CMD_CD " <path>\t: VFS: Change directory\r\n");
+      }
+      else if(strcmp_(args[0], CMD_MOUNT) == 0){
+        if(args_cnt == 3)
+          sysc_mount(NULL, args[1], args[2], 0, NULL);
+        else
+        uart_printf("Usage:" CMD_MOUNT " <path> <fs>\t: VFS: Mount specific file system on path\r\n");
       }
       
       else

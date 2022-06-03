@@ -114,10 +114,12 @@ int tmpfs_close(file *file){
 }
 
 int tmpfs_setup_mount(struct filesystem *fs, mount *mount){
-  if(mount == NULL || mount->root == NULL){
+  if(mount == NULL){
     uart_printf("Error, tmpfs_setup_mount(), NULL pointer.");
-    uart_printf(" mount=%p, mount->root=%p\r\n", mount, mount==NULL ? NULL : mount->root);
   }
+  mount->root = diy_malloc(sizeof(vnode));
+  mount->fs = fs;
+  mount->root->mount = NULL;
   mount->root->comp = diy_malloc(sizeof(vnode_comp));
   mount->root->comp->comp_name = "";
   mount->root->comp->len = 0;
@@ -207,7 +209,7 @@ int tmpfs_lookup(vnode *dir_node, vnode **target, const char *component_name){
   for(size_t i=0; i<dir_node->comp->len; i++){
     entry = dir_node->comp->entries[i];
     if(strcmp_(component_name, entry->comp->comp_name) == 0){
-      *target = entry;
+      *target = entry->mount == NULL ? entry : (entry->mount->root);
       return 0;
     }
   }

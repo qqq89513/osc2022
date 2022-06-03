@@ -75,7 +75,7 @@ int vfs_close(file *file);
 int vfs_write(file *file, void *buf, size_t len);
 int vfs_read(file *file, void *buf, size_t len);
 int vfs_mkdir(char *pathname);
-int vfs_mount(char *pathname, char *fs_name);
+int vfs_mount(char *pathname, const char *fs_name);
 int vfs_lookup(char *pathname, vnode **target);
 void vfs_dump_root();
 void vfs_dump_under(vnode *node, int depth);
