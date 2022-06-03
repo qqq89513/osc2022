@@ -4,6 +4,9 @@
 #include "uart.h"
 #include "diy_malloc.h"
 
+#define CURRENT_DIR "."
+#define PARENT_DIR ".."
+
 vnode root_vnode;
 mount root_mount = {.fs=NULL, .root=&root_vnode};
 
@@ -105,6 +108,69 @@ static int first_component(char *pathname, char *comp_name){
   return 0;
 }
 
+/** Translate (absolute/relative) path to absolute path. "." and ".." is also handled.
+ * @param abs_path: output abs path
+ * @param cwd: current working directory, used when @param path is relative path. Starts and ends with '/'
+ * @param path: Start with '/' for absolute path, relative path otherwise
+ * @return 0 on success, 1 on cwd either starts or ends without '/'
+ * @note If ".." meets root "/", ".." accumulates at the begining.
+*/
+int to_abs_path(char *abs_path, const char *cwd, const char *path){
+
+  // Input abs path, copy directly and return
+  if(path[0] == '/'){
+    strcpy_(abs_path, path);
+    return 0;
+  }
+
+  // Return if cwd not starts or not ends with '/'
+  if(cwd[0] != '/' || cwd[strlen_(cwd)-1] != '/'){
+    uart_printf("Error, to_abs_path(), cwd should stars and ends with \"/\", cwd=%s\r\n", cwd);
+    return 1;
+  }
+
+  // Concatenate cwd and input path
+  char untrans[TMPFS_MAX_PATH_LEN]; // "." and ".." are untranslated yet
+  untrans[0] = '\0';
+  strcat_(untrans, cwd);
+  strcat_(untrans, path);
+
+  // Spilt string by "/"
+  char *comps[VFS_MAX_DEPTH]; // component string array
+  int count = str_spilt(comps, untrans, "/");
+
+  // Translate "." and ".."
+  int w = 0;  // write(update) index, w-- is like pop, w++ is like push. in place FILO
+  int r = 0;  // read index, always advance by 1. in place FIFO
+  while(w < count && r < count){
+    // Skip blank and "."
+    while(comps[r][0] == '\0' || strcmp_(comps[r], CURRENT_DIR) == 0)
+      r++;
+
+    // Handle ".."
+    if(strcmp_(comps[r], PARENT_DIR) == 0){
+      // when stack empty (w==0) or stack top is "..", then push ".."
+      if(w == 0 || strcmp_(comps[w-1], PARENT_DIR)==0)
+        comps[w++] = comps[r];   // push ".."
+      else
+        comps[w--] = NULL;    // pop, just "w--;" also does the job
+    }
+
+    // Push normal component
+    else
+      comps[w++] = comps[r];
+
+    r++;
+  }
+
+  count = w; // items after w are ignored
+  abs_path[0] = '\0'; // clear string
+  for(int i=0; i<count; i++){
+    strcat_(abs_path, "/");
+    strcat_(abs_path, comps[i]);
+  }
+  return 0;
+}
 
 int register_filesystem(filesystem *fs){
   // register the file system to the kernel.
@@ -139,6 +205,9 @@ int vfs_mount(char *pathname, char *fs_name){
     mount_at_node->mount->fs = &tmpfs;
     mount_at_node->mount->root = mount_at_node;  // mount_at_node is the root node of this mount
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    char abs_path[255];
+    to_abs_path(abs_path, "/hello/", "text/../../../lr/../hello2/./bull/da/disapper/../apper");
+    uart_printf("abs_path=%s\r\n", abs_path);
     return ret;
   }
   else{

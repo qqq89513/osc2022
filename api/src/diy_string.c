@@ -7,7 +7,7 @@ unsigned int strlen_(const char* src){
   return len;
 }
 
-char* strcat_(char* dest,char* src){
+char* strcat_(char* dest, const char* src){
   char *tmp = dest;
   while(*dest++);
   dest--;
@@ -15,7 +15,7 @@ char* strcat_(char* dest,char* src){
   return tmp;
 }
 
-char* strcpy_(char* dest,const char* src){
+char* strcpy_(char* dest, const char* src){
   char *tmp = dest;
   while(*src)
   *dest++=*src++;

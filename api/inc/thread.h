@@ -8,6 +8,7 @@ extern "C" {
 #include <stdint.h>
 #include "diy_malloc.h"
 #include "virtual_file_system.h"
+#include "tmpfs.h"
 
 #define DEFAULT_THREAD_SIZE (PAGE_SIZE*4) // 4kB, this includes the size of a stack and the thread's TCB
 
@@ -51,6 +52,7 @@ typedef struct thread_t {
   enum task_exeception_level mode;
   void *target_func;
   file *fd_table[VFS_PROCESS_MAX_OPEN_FILE];  // should be zeroed out on thread_create
+  char cwd[TMPFS_MAX_PATH_LEN];               // current working directory, should initialized on thread_create
   struct thread_t *next;
 } thread_t;
 

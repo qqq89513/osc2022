@@ -9,7 +9,7 @@ extern "C" {
 #include <stddef.h>
 
 unsigned int strlen_(const char* src);
-char* strcat_(char* dest,char* src);
+char* strcat_(char* dest, const char* src);
 char* strcpy_(char* dest,const char* src);
 int strcmp_(const char* src1,const char* src2);
 char *strtok_(char *str, char *delimiter);
