@@ -202,8 +202,8 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   else                     thd_new->ppid = thd_parent->pid; // Thread created from main() from kernel
 
   // Init parameters for virtual file system
-  if(thd_parent != NULL)  strcpy_(thd_new->cwd, thd_parent->cwd);
-  else                    strcpy_(thd_new->cwd, "/");
+  thd_new->cwd[0] = '\0'; // clear string
+  strcpy_(thd_new->cwd, "/"); // should copy parent's cwd if there is a parent (but failed on HW)
   memset_(thd_new->fd_table, 0, sizeof(thd_new->fd_table)); // init file table
 
   // Open stdin, stdout, stderr for the process
