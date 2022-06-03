@@ -386,10 +386,12 @@ static int    priv_open(const char *pathname, int flags){
 
   // Translate to absolute path
   char abs_path[TMPFS_MAX_PATH_LEN];
+  abs_path[0] = '\0';
   to_abs_path(abs_path, thd->cwd, pathname);
 
   file *fh = NULL;
   int ret = vfs_open((char*)abs_path, flags, &fh);
+  uart_printf("Debug, priv_open(), abs_path=%s, flags=0x%X, ret=%d\r\n", abs_path, flags, ret);
   if(ret == 0){
     thd->fd_table[fd] = fh;
     return fd;
@@ -476,6 +478,7 @@ static int    priv_mkdir(const char *pathname, unsigned mode){
   thread_t *thd = thread_get_current();
   // Translate to absolute path
   char abs_path[TMPFS_MAX_PATH_LEN];
+  abs_path[0] = '\0';
   to_abs_path(abs_path, thd->cwd, pathname);
   return vfs_mkdir((char*)abs_path);
 }
@@ -513,12 +516,15 @@ static int    priv_chdir(const char *path){
   char changed_path[TMPFS_MAX_PATH_LEN];
   int ret = 0;
   vnode *node = NULL;
+  changed_path[0] = '\0';
   to_abs_path(changed_path, thd->cwd, path);
+  if(changed_path[strlen_(changed_path)-1] != '/')
+    strcat_(changed_path, "/");
   ret = vfs_lookup(changed_path, &node);
-  strcat_(changed_path, "/");
   if(ret == 0)
     strcpy_(thd->cwd, changed_path);
-  uart_printf("Debug, priv_chdir(), pid=%d, cwd=%s\r\n", thd->pid, thd->cwd);
+
+  uart_printf("Debug, priv_chdir(), pid=%d, path=%s, cwd=%s\r\n", thd->pid, path, thd->cwd);
   return ret;
 }
 
