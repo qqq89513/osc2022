@@ -31,6 +31,7 @@
 #define CMD_READ          "read"
 #define CMD_MKDIR         "mkdir"
 #define CMD_LS            "ls"
+#define CMD_CD            "cd"
 
 #define ADDR_IMAGE_START 0x80000
 
@@ -252,6 +253,7 @@ static void shell(){
         uart_printf(CMD_MKDIR " <dir_path>\t: VFS: Create directory\r\n");
         uart_printf(CMD_WRITE " <file> <str>\t: VFS: Write string to file, create if not exist, rewrite if exist\r\n");
         uart_printf(CMD_READ " <file> <len>\t: VFS: Read len bytes from file, print as string\r\n");
+        uart_printf(CMD_CD       " <path>\t\t: VFS: Change directory\r\n");
         
       }
       else if(strcmp_(args[0], CMD_REBOOT) == 0){
@@ -368,6 +370,13 @@ static void shell(){
       else if(strcmp_(args[0], CMD_LS) == 0){
         vfs_dump_root();
       }
+      else if(strcmp_(args[0], CMD_CD) == 0){
+        if(args_cnt == 2)
+          sysc_chdir(args[1]);
+        else
+          uart_printf("Usage:" CMD_CD " <path>\t: VFS: Change directory\r\n");
+      }
+      
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
     }

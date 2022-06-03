@@ -9,6 +9,7 @@
 #include "general.h"
 #include "mmu.h"
 #include "virtual_file_system.h"
+#include "diy_string.h"
 
 #ifdef THREADS  // pass -DTHREADS to compiler for lab5
 // Lab5, basic 2 description: The system call numbers given below would be stored in x8
@@ -383,8 +384,12 @@ static int    priv_open(const char *pathname, int flags){
     return -1;
   }
 
+  // Translate to absolute path
+  char abs_path[TMPFS_MAX_PATH_LEN];
+  to_abs_path(abs_path, thd->cwd, pathname);
+
   file *fh = NULL;
-  int ret = vfs_open((char*)pathname, flags, &fh);
+  int ret = vfs_open((char*)abs_path, flags, &fh);
   if(ret == 0){
     thd->fd_table[fd] = fh;
     return fd;
@@ -468,7 +473,11 @@ int           sysc_mkdir(const char *pathname, unsigned mode){
   return ret_val;
 }
 static int    priv_mkdir(const char *pathname, unsigned mode){
-  return vfs_mkdir((char*)pathname);
+  thread_t *thd = thread_get_current();
+  // Translate to absolute path
+  char abs_path[TMPFS_MAX_PATH_LEN];
+  to_abs_path(abs_path, thd->cwd, pathname);
+  return vfs_mkdir((char*)abs_path);
 }
 
 // arguments other than target (where to mount) and filesystem (fs name) are ignored
@@ -495,7 +504,17 @@ int           sysc_chdir(const char *path){
   return ret_val;
 }
 static int    priv_chdir(const char *path){
-  return 1;
+  thread_t *thd = thread_get_current();
+  char changed_path[TMPFS_MAX_PATH_LEN];
+  int ret = 0;
+  vnode *node = NULL;
+  to_abs_path(changed_path, thd->cwd, path);
+  ret = vfs_lookup(changed_path, &node);
+  strcat_(changed_path, "/");
+  if(ret == 0)
+    strcpy_(thd->cwd, changed_path);
+  uart_printf("Debug, priv_chdir(), pid=%d, cwd=%s\r\n", thd->pid, thd->cwd);
+  return ret;
 }
 
 #endif

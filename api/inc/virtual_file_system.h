@@ -80,6 +80,8 @@ int vfs_lookup(char *pathname, vnode **target);
 void vfs_dump_root();
 void vfs_dump_under(vnode *node, int depth);
 
+int to_abs_path(char *abs_path, const char *cwd, const char *path);
+
 #ifdef __cplusplus
 }
 #endif
