@@ -159,10 +159,19 @@ static int    priv_exec(const char *name, char *const argv[], trap_frame *tf){
 
   // Copy image to a dynamic allocated space
   load_addr = diy_malloc(PAGE_SIZE*64);
-  if(cpio_copy((char*)name, load_addr) != 0){
-    uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
+  file *fh = NULL;
+  int ret = vfs_open((char*)name, 0, &fh);
+  if(ret == 0){
+    fh->f_ops->read(fh, load_addr, PAGE_SIZE*64);
+    fh->f_ops->close(fh);
+  }
+  else{
     return -1;
   }
+  // if(cpio_copy((char*)name, load_addr) != 0){
+  //   uart_printf("sysc_exec() failed, failed to locate file %s.\r\n", name);
+  //   return -1;
+  // }
 
 #ifdef VIRTUAL_MEM
   // Map custom virtual address to dynamic allocated address

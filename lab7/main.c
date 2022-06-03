@@ -387,7 +387,7 @@ static void shell(){
         uart_printf("Usage:" CMD_MOUNT " <path> <fs>\t: VFS: Mount specific file system on path\r\n");
       }
       else if(strcmp_(args[0], "run") == 0){
-        sysc_exec("vfs1.img", NULL);
+        sysc_exec("/initramfs/vfs1.img", NULL);
       }
       else
         uart_printf("Unknown cmd \"%s\".\r\n", input_s);
