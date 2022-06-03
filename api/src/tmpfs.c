@@ -38,7 +38,7 @@ int tmpfs_write(file *file, const void *buf, size_t len){
   // Reallocate new space if current size is not big enough
   const size_t ideal_final_pos = file->f_pos + len;
   if(ideal_final_pos > comp->len && comp->len < TMPFS_MAX_FILE_SIZE){
-    size_t new_len = ideal_final_pos + 512; // always allocate 512 bytes more
+    size_t new_len = ideal_final_pos >= TMPFS_MAX_FILE_SIZE ? TMPFS_MAX_FILE_SIZE : ideal_final_pos;
     new_len = new_len > TMPFS_MAX_FILE_SIZE ? TMPFS_MAX_FILE_SIZE : new_len;  // truncate to TMPFS_MAX_FILE_SIZE
     char *new_space = diy_malloc(sizeof(char) * new_len);
     if(comp->len > 0){
