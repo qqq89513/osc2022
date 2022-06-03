@@ -6,6 +6,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include "virtual_file_system.h"
+#include "tmpfs.h"
+
 
 #define CPIO_ADDR ((void*)0x8000000) // 0x20000000 for bare-metal rpi, 0x8000000 for qemu
 #define CPIO_MAX_FILES 32
@@ -44,6 +47,23 @@ int cpio_parse(void *addr);
 void cpio_ls();
 int cpio_copy(char *file_name, uint8_t *destination);
 int cpio_cat(char *file_name);
+
+
+// initramfs, API to virtual_file_system.h --------------------------------
+
+extern filesystem initramfs;
+
+int initramfs_setup_mount(struct filesystem *fs, mount *mount);
+// fops
+int initramfs_write(file *file, const void *buf, size_t len);
+int initramfs_read(file *file, void *buf, size_t len);
+int initramfs_open(vnode* file_node, file** target);
+int initramfs_close(file *file);
+
+// vops
+int initramfs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
+int initramfs_create(vnode *dir_node, vnode **target, const char *component_name);
+int initramfs_lookup(vnode *dir_node, vnode **target, const char *component_name);
 
 #ifdef __cplusplus
 }

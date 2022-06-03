@@ -3,6 +3,7 @@
 #include "diy_string.h"
 #include "uart.h"
 #include "diy_malloc.h"
+#include "cpio.h"
 
 #define CURRENT_DIR "."
 #define PARENT_DIR ".."
@@ -10,7 +11,6 @@
 vnode root_vnode;
 mount root_mount = {.fs=NULL, .root=&root_vnode};
 
-static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int create);
 static char *skip_first_comp(char *pathname);
 static int first_component(char *pathname, char *comp_name);
 
@@ -22,7 +22,7 @@ static int first_component(char *pathname, char *comp_name);
  * @param create: Set to 1 to create entry if the path not exist, 0 to do nothing. The created node is set to COMP_DIR, can be changed after
  * @return 0 on found, non-0 otherwise. If create==1 and not found, return create()
 */
-static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int create){
+int lookup_recur(char *pathname, vnode *dir_node, vnode **node_found, int create){
   char *rest_path = NULL;
   char comp_name[TMPFS_MAX_COMPONENT_NAME];
   rest_path = skip_first_comp(pathname);
@@ -30,11 +30,11 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int 
 
   // Cross mount point, don't know if this is the right way to do it
   if(dir_node->mount != NULL)
-    return lookup_priv(pathname, dir_node->mount->root, node_found, create);
+    return lookup_recur(pathname, dir_node->mount->root, node_found, create);
 
   // Return if dir_node is not COMP_DIR
   if(dir_node->comp->type != COMP_DIR){
-    uart_printf("Error, lookup_priv(), failed, pathname=%s, search_under_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
+    uart_printf("Error, lookup_recur(), failed, pathname=%s, search_under_name=%s, dir_node=0x%lX, type=%d, not folder\r\n", 
       pathname, dir_node->comp->comp_name, (uint64_t)dir_node, dir_node->comp->type);
     return 2;
   }
@@ -45,7 +45,7 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int 
 
     // More to lookup and can lookup deeper
     if     (rest_path[0] != '\0' && dir_node->comp->type == COMP_DIR)
-      return lookup_priv(rest_path, dir_node, node_found, create);
+      return lookup_recur(rest_path, dir_node, node_found, create);
 
     // More to lookup and cannot lookup deeper, return not found
     else if(rest_path[0] != '\0' && dir_node->comp->type == COMP_FILE)
@@ -57,7 +57,7 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int 
 
     // Exception
     else{
-      uart_printf("Exception, lookup_priv(), should not get here, dir_node=%lX, comp_name=%s, type=%d\r\n",
+      uart_printf("Exception, lookup_recur(), should not get here, dir_node=%lX, comp_name=%s, type=%d\r\n",
         (uint64_t)dir_node, dir_node->comp->comp_name, dir_node->comp->type);
       return 3;
     }
@@ -70,19 +70,19 @@ static int lookup_priv(char *pathname, vnode *dir_node, vnode **node_found, int 
     char path_copy[TMPFS_MAX_PATH_LEN];
     int comp_count = 0;
     int mkdir_ret = 0;
-    // uart_printf("Debug, lookup_priv(), path=%s, rest=%s, comp=%s\r\n", pathname, rest_path, comp_name);
+    // uart_printf("Debug, lookup_recur(), path=%s, rest=%s, comp=%s\r\n", pathname, rest_path, comp_name);
     // copy string since rest_path is from pathname, where pathname should not be changed
     strcpy_(path_copy, pathname);
     comp_count = str_spilt(rest_comps, path_copy, "/");
     for(int i=0; i<comp_count; i++){
       if(rest_comps[i][0] == '\0') continue; // skip NULL strings
-      // uart_printf("Debug, lookup_priv(), create, i=%d, dir=0x%lX, %s\r\n", i, (uint64_t)dir_node, rest_comps[i]);
+      // uart_printf("Debug, lookup_recur(), create, i=%d, dir=0x%lX, %s\r\n", i, (uint64_t)dir_node, rest_comps[i]);
       mkdir_ret = dir_node->v_ops->mkdir(dir_node, node_found, rest_comps[i]);
       if(mkdir_ret == 0){
         dir_node = *node_found;
       }
       else{
-        uart_printf("Error, lookup_priv(), failed to create(), %s, rest_comps[%d]=%s\r\n", path_copy, i, rest_comps[i]);
+        uart_printf("Error, lookup_recur(), failed to create(), %s, rest_comps[%d]=%s\r\n", path_copy, i, rest_comps[i]);
         return mkdir_ret;
       }
     }
@@ -204,12 +204,20 @@ int vfs_mount(char *pathname, const char *fs_name){
     return 1;
   }
 
-  if(strcmp_(fs_name, tmpfs.name) == 0){
+  if     (strcmp_(fs_name, tmpfs.name) == 0){
     mount_at_node->mount = diy_malloc(sizeof(mount));
     mount_at_node->mount->fs = &tmpfs;
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
-    uart_printf("Debug, vfs_mount(), path=%s, mount_at_node=%p, root_vnode=%p, mount_to=%p\r\n", pathname, mount_at_node, &root_vnode, root_vnode.mount->root);
-
+    uart_printf("Debug, vfs_mount(), path=%s, fs=%s, root_vnode=0x%lX, mount_at=0x%lX, mount_to=0x%lX\r\n", 
+      pathname, fs_name, (uint64_t)&root_vnode, (uint64_t)mount_at_node, (uint64_t)mount_at_node->mount->root);
+    return ret;
+  }
+  else if(strcmp_(fs_name, initramfs.name) == 0){
+    mount_at_node->mount = diy_malloc(sizeof(mount));
+    mount_at_node->mount->fs = &initramfs;
+    const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    uart_printf("Debug, vfs_mount(), path=%s, fs=%s, root_vnode=0x%lX, mount_at=0x%lX, mount_to=0x%lX\r\n", 
+      pathname, fs_name, (uint64_t)&root_vnode, (uint64_t)mount_at_node, (uint64_t)mount_at_node->mount->root);
     return ret;
   }
   else{
@@ -225,7 +233,7 @@ int vfs_lookup(char *pathname, vnode **target){
     return 0;
   }
   else{
-    return lookup_priv(pathname, &root_vnode, target, 0);
+    return lookup_recur(pathname, &root_vnode, target, 0);
   }
 }
 
@@ -238,7 +246,7 @@ int vfs_open(char *pathname, int flags, file **file_handle){
   
   // Create a new file if vnode not found and O_CREAT
   if(ret != 0 && (flags & O_CREAT)){
-    ret = lookup_priv(pathname, &root_vnode, &node, 1); // create via lookup_priv()
+    ret = lookup_recur(pathname, &root_vnode, &node, 1); // create via lookup_recur()
     if(ret == 0) node->comp->type = COMP_FILE;
     else{
       uart_printf("Exception, vfs_open(), failed to create %s, ret=%d\r\n", pathname, ret);
@@ -290,7 +298,7 @@ int vfs_mkdir(char *pathname){
   }
   else{
     vnode *node = NULL;
-    int ret = lookup_priv(pathname, &root_vnode, &node, 1);
+    int ret = lookup_recur(pathname, &root_vnode, &node, 1);
     if(ret != 0){
       uart_printf("Error, vfs_mkdir(), failed to create %s", pathname);
       uart_printf(", last entry 0x%lX, %s, type=%d, len=%lu\r\n", 

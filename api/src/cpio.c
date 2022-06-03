@@ -4,9 +4,13 @@
 #include "cpio.h"
 #include "diy_sscanf.h"
 #include "uart.h"
+#include "virtual_file_system.h"
+#include "tmpfs.h"
+#include "diy_malloc.h"
 
 
 static cpio_file_ll files_arr[CPIO_MAX_FILES];
+static int mounted = 0;
 
 
 static uint32_t header_get_mem(uint8_t* member, size_t size){
@@ -117,4 +121,85 @@ int cpio_cat(char *file_name){
   }
   uart_printf("cat: cannot access '%s': No such file or directory\r\n", file_name);
   return -1;
+}
+
+// initramfs, API to virtual_file_system.h --------------------------------
+filesystem initramfs = {.name="initramfs", .setup_mount=initramfs_setup_mount};
+file_operations initramfs_fops = {.write=initramfs_write, .read=initramfs_read, .open=initramfs_open, .close=initramfs_close};
+vnode_operations initramfs_vops = {.lookup=initramfs_lookup, .create=initramfs_create, .mkdir=initramfs_mkdir};
+
+int initramfs_setup_mount(struct filesystem *fs, mount *mount){
+  if(mount == NULL){
+    uart_printf("Error, initramfs_setup_mount(), NULL pointer.");
+  }
+  mount->root = diy_malloc(sizeof(vnode));
+  mount->fs = fs;
+  mount->root->mount = NULL;
+  mount->root->comp = diy_malloc(sizeof(vnode_comp));
+  mount->root->comp->comp_name = "";
+  mount->root->comp->len = 0;
+  mount->root->comp->entries = NULL;
+  mount->root->comp->type = COMP_DIR;
+  mount->root->f_ops = &initramfs_fops;
+  mount->root->v_ops = &initramfs_vops;
+
+  if(mounted)
+    return 0;
+
+  // Insert files in the linked list to the file system
+  cpio_file_ll *file = files_arr;
+  vnode *dir_node = mount->root;
+  vnode *node_new = NULL;
+  while(file->next != NULL){
+
+    // Skip 0 files
+    if(file->file_size > 0){
+      // Create entry
+      lookup_recur((char*)file->pathname, dir_node, &node_new, 1);
+
+      // Config entry to a file
+      node_new->comp->type = COMP_FILE;
+      node_new->comp->data = (char*)file->data_ptr;
+      node_new->comp->len = file->file_size;
+    }
+    file = file->next;
+  }
+  mounted = 1;
+  return 0;
+}
+
+// fops
+int initramfs_write(file *file, const void *buf, size_t len){
+  uart_printf("Error, initramfs_write(), cannot modify initramfs\r\n");
+  return 0;
+}
+int initramfs_read(file *file, void *buf, size_t len){
+  return tmpfs_read(file, buf, len);
+}
+int initramfs_open(vnode* file_node, file** target){
+  return tmpfs_open(file_node, target);
+}
+int initramfs_close(file *file){
+  return tmpfs_close(file);
+}
+
+// vops
+int initramfs_mkdir(vnode *dir_node, vnode **target, const char *component_name){
+  if(mounted){
+    uart_printf("Error, initramfs_mkdir(), cannot modify initramfs\r\n");
+    return 1;
+  }
+  else
+    return tmpfs_mkdir(dir_node, target, component_name);
+}
+int initramfs_create(vnode *dir_node, vnode **target, const char *component_name){
+  if(mounted){
+    uart_printf("Error, initramfs_create(), cannot modify initramfs\r\n");
+    return 1;
+  }
+  else
+    return tmpfs_create(dir_node, target, component_name);
+}
+int initramfs_lookup(vnode *dir_node, vnode **target, const char *component_name){
+  return tmpfs_lookup(dir_node, target, component_name);
 }

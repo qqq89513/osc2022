@@ -59,6 +59,8 @@ void main(void *dtb_addr)
   uart_printf("dtb_addr=0x%p, __image_start=%p, __image_end=%p\r\n", dtb_addr, &__image_start, &__image_end);
 
   vfs_mount("/", "tmpfs");
+  vfs_mkdir("/initramfs");
+  vfs_mount("/initramfs", "initramfs");
 
   thread_init();
   thread_create(shell, USER);
@@ -361,7 +363,7 @@ static void shell(){
           if(fd >= 0){
             int read = sysc_read(fd, buf, len);
             uart_printf("shell(): read %d bytes:\r\n", read);
-            uart_printf("%s\r\n", buf);
+            uart_puts(buf);
             sysc_close(fd);
           }
           diy_free(buf);

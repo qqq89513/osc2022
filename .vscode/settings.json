@@ -25,7 +25,8 @@
     "diy_string.h": "c",
     "mmu.h": "c",
     "tmpfs.h": "c",
-    "virtual_file_system.h": "c"
+    "virtual_file_system.h": "c",
+    "cpio.h": "c"
   }
 
 }
