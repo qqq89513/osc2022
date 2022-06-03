@@ -61,6 +61,8 @@ void main(void *dtb_addr)
   vfs_mount("/", "tmpfs");
   vfs_mkdir("/initramfs");
   vfs_mount("/initramfs", "initramfs");
+  vfs_mkdir("/dev");
+  vfs_mount("/dev", "devfs");
 
   thread_init();
   thread_create(shell, USER);

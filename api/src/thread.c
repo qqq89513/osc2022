@@ -8,6 +8,10 @@
 
 #ifdef THREADS  // pass -DTHREADS to compiler for lab5
 
+#define FD_STDIN  0
+#define FD_STDOUT 1
+#define FD_STDERR 2
+
 #define PID_KERNEL_MAIN 0
 #define PID_IDLE        1
 
@@ -87,6 +91,13 @@ static void clean_exited(){
       else
         uart_printf("Exception, in clean_exited(), thd.mode=USER but thd.user_space=NULL\r\n");
     }
+
+    // Close opened files
+    for(int i=0; i<VFS_PROCESS_MAX_OPEN_FILE; i++){
+      if(thd->fd_table[i] != NULL)
+        vfs_close(thd->fd_table[i]);
+    }
+
     thd = thd->next;
     diy_free(temp);
   }
@@ -194,6 +205,12 @@ thread_t *thread_create(void *func, enum task_exeception_level mode){
   if(thd_parent != NULL)  strcpy_(thd_new->cwd, thd_parent->cwd);
   else                    strcpy_(thd_new->cwd, "/");
   memset_(thd_new->fd_table, 0, sizeof(thd_new->fd_table)); // init file table
+
+  // Open stdin, stdout, stderr for the process
+  file *fh = NULL;
+  vfs_open("/dev/uart", 0, &fh);  thd_new->fd_table[FD_STDIN] = fh;
+  vfs_open("/dev/uart", 0, &fh);  thd_new->fd_table[FD_STDOUT] = fh;
+  vfs_open("/dev/uart", 0, &fh);  thd_new->fd_table[FD_STDERR] = fh;
 
 #ifdef VIRTUAL_MEM
   thd_new->ttbr0_el1 = read_sysreg(ttbr0_el1);
