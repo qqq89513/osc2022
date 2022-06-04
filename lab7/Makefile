@@ -55,13 +55,13 @@ clean:
 	rm debug/ -rf
 
 run:
-	qemu-system-aarch64 -display none -M raspi3b -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/kernel8.img --accel tcg,thread=single
+	qemu-system-aarch64 -display gtk -M raspi3b -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR)/kernel8.img --accel tcg,thread=single
 
 gdb:
 	aarch64-none-elf-gdb.exe --eval-command="target remote:1234" ./debug/kernel8.elf
 
 run_gdb:
-	qemu-system-aarch64 -M raspi3b -display none -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR_gdb)/kernel8.img -gdb tcp::1234 -S --accel tcg,thread=single
+	qemu-system-aarch64 -M raspi3b -display gtk -serial null -serial stdio -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -kernel $(OUTPUT_DIR_gdb)/kernel8.img -gdb tcp::1234 -S --accel tcg,thread=single
 
 build_gdb:
 	make BUILD_DIR="$(BUILD_DIR_gdb)" ASMFLAGS="$(ASMFLAGS_gdb)" CCFLAGS="$(CCFLAGS_gdb)" LDFLAGS="$(LDFLAGS_gdb)" all --no-print-directory
