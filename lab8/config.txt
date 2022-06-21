@@ -1,0 +1,3 @@
+
+arm_64bit=1
+initramfs initfs.cp 0x8000000
