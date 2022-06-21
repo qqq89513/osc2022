@@ -25,4 +25,6 @@ int mbox_arm_mem_info(uint32_t **base_addr, uint32_t *size);
 
 int mbox_call_user_buffer(unsigned char ch, unsigned int *mbox);
 
+char *framebuffer_init();
+
 #endif /* __MBOX_H */

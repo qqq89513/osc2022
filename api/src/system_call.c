@@ -28,6 +28,7 @@
 #define SYSCALL_NUM_MKDIR      15
 #define SYSCALL_NUM_MOUNT      16
 #define SYSCALL_NUM_CHDIR      17
+#define SYSCALL_NUM_LSEEK      18
 
 extern void kid_thread_return_fork();   // defined in vect_table_and_execption_handler.S
 
@@ -47,6 +48,7 @@ static size_t priv_read(int fd, void *buf, size_t count);
 static int    priv_mkdir(const char *pathname, unsigned mode);
 static int    priv_mount(const char *src, const char *target, const char *filesystem, unsigned long flags, const void *data);
 static int    priv_chdir(const char *path);
+static long   priv_lseek64(int fd, long offset, int whence);
 
 
 /**
@@ -81,6 +83,7 @@ void system_call(trap_frame *tf){
       tf->x0 = priv_mount((const char*)tf->x0, (const char*)tf->x1, (const char*)tf->x2, tf->x3, (const void*)tf->x4);
       break;
     case SYSCALL_NUM_CHDIR:       tf->x0 = priv_chdir((const char*)tf->x0);                               break;
+    case SYSCALL_NUM_LSEEK:       tf->x0 = priv_lseek64(tf->x0, tf->x1, tf->x2);                          break;
 
     default:
       thd = thread_get_current();
@@ -535,6 +538,16 @@ static int    priv_chdir(const char *path){
 
   uart_printf("Debug, priv_chdir(), pid=%d, path=%s, cwd=%s\r\n", thd->pid, path, thd->cwd);
   return ret;
+}
+
+static long   priv_lseek64(int fd, long offset, int whence){
+  thread_t *thd = thread_get_current();
+  file *fh = thd->fd_table[fd];
+  if(fh == NULL){
+    uart_printf("Error, priv_lseek64(), unrecognized fd=%d, pid=%d\r\n", fd, thd->pid);
+    return 0;
+  }
+  return fh->f_ops->lseek64(fh, offset, whence);
 }
 
 #endif

@@ -27,7 +27,8 @@
     "tmpfs.h": "c",
     "virtual_file_system.h": "c",
     "cpio.h": "c",
-    "devfs.h": "c"
+    "devfs.h": "c",
+    "mbox.h": "c"
   }
 
 }

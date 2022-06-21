@@ -14,6 +14,7 @@ int devfs_write(file *file, const void *buf, size_t len);
 int devfs_read(file *file, void *buf, size_t len);
 int devfs_open(vnode* file_node, file** target);
 int devfs_close(file *file);
+long devfs_lseek(file *file, long offset, int whence);
 
 // vops
 int devfs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
