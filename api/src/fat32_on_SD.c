@@ -3,6 +3,9 @@
 #include "sd.h"
 #include "virtual_file_system.h"
 #include "uart.h"
+#include "tmpfs.h"
+#include "diy_string.h"
+#include "diy_malloc.h"
 #include <stdint.h>
 
 /*
@@ -13,12 +16,6 @@
   Ref[5]: https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
 */
 
-static int fat32fs_mount(struct filesystem *fs, struct mount *mount);
-
-filesystem fat32fs = {
-  .name = "fat32fs",
-  .setup_mount = fat32fs_mount
-};
 
 typedef struct partition_t {
   uint8_t status;
@@ -93,13 +90,31 @@ typedef struct dir_entry  {
   uint32_t fileSize;    // 28~31, 32-bit quantity containing size in bytes of file/directory described by this entry. 
 } __attribute__((packed)) dir_entry;
 
+
+// VFS bridge -----------------------------------------------------------
+static int fat32fs_mounted = 0;
+static int fat32fs_mount(struct filesystem *fs, struct mount *mount);
+
+// fops
+static int fat32fs_write(file *file, const void *buf, size_t len);
+static int fat32fs_read(file *file, void *buf, size_t len);
+static int fat32fs_open(vnode* file_node, file** target);
+static int fat32fs_close(file *file);
+
+// vops
+static int fat32fs_mkdir(vnode *dir_node, vnode **target, const char *component_name);
+static int fat32fs_create(vnode *dir_node, vnode **target, const char *component_name);
+static int fat32fs_lookup(vnode *dir_node, vnode **target, const char *component_name);
+
+filesystem fat32fs = {
+  .name = "fat32fs",
+  .setup_mount = fat32fs_mount
+};
+file_operations fat32fs_fops = {.write=fat32fs_write, .read=fat32fs_read, .open=fat32fs_open, .close=fat32fs_close};
+vnode_operations fat32fs_vops = {.lookup=fat32fs_lookup, .create=fat32fs_create, .mkdir=fat32fs_mkdir};
+
 static int fat32fs_mount(filesystem *fs, mount *mount){
   const MBR_t *mbr;
-  struct fat_info_t *fat;
-  struct fat_dir_t *dir;
-  struct fat_internal *data;
-  struct vnode *oldnode, *node;
-  const char *name;
   uint32_t lba;
   uint8_t buf[SD_BLOCK_SIZE];
 
@@ -113,7 +128,7 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
     return -1;
   }
   if (mbr->part1.type != 0x0B && mbr->part1.type != 0x0C) { // 0x0B for fat32, 0x0C for fat32 with LBA 0x13 extension
-    uart_printf("Exception, fat32fs_mount(), unexpected partition type = 0x%02D\r\n", mbr->part1.type);
+    uart_printf("Exception, fat32fs_mount(), unexpected partition type = 0x%02d\r\n", mbr->part1.type);
     return -1;
   }
 
@@ -128,10 +143,95 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
   boot_sector_t *VBR = (boot_sector_t*) buf;
   uint32_t FAT1_lba = lba + VBR->reserved_sector_cnt;
   uint32_t root_dir_lba = FAT1_lba + (VBR->fat_cnt * VBR->sector_per_fat32);
+  uint32_t root_cluster = VBR->root_cluster;
   readblock(root_dir_lba, buf);
   dir_entry *root_dir_entry = (dir_entry*) buf;
-  uart_printf("lba=%d, FAT_lba=%d, root_dir_lba=%d, filename=%s\r\n", lba, FAT1_lba, root_dir_lba, root_dir_entry->name);
+
+  mount->root = diy_malloc(sizeof(vnode));
+  mount->fs = fs;
+  mount->root->mount = NULL;
+  mount->root->comp = diy_malloc(sizeof(vnode_comp));
+  mount->root->comp->comp_name = "";
+  mount->root->comp->len = 0;
+  mount->root->comp->lba = root_dir_lba;
+  mount->root->comp->type = COMP_DIR;
+  mount->root->f_ops = &fat32fs_fops;
+  mount->root->v_ops = &fat32fs_vops;
+
+  // Insert files in the root_dir_entry to the file system
+  vnode *dir_node = mount->root;
+  vnode *node_new = NULL;
+  const dir_entry *item = (dir_entry*) root_dir_entry;
+  for(int i=0; i<SD_BLOCK_SIZE/sizeof(dir_entry); i++){
+    
+    // Skip empty entry
+    if(item[i].name[i] != '\0'){
+      char *name = diy_malloc(sizeof(item->name) + 2); // +1 for . in fileName.ext and end of string
+      
+      // Copy entry name
+      int j = 0;  // name[j]
+      int k = 0;  // item[i].name[k];
+      for(k=0; k<8 && item[i].name[k] != ' '; k++)   name[j++] = item[i].name[k];
+      name[j++] = '.';
+      for(k=8; k<sizeof(item->name) && item[i].name[k] != ' '; k++)   name[j++] = item[i].name[k];
+      name[j] = '\0';
+
+      // Create entry along tmpfs
+      lookup_recur((char*)name, dir_node, &node_new, 1);
+      
+      // Config entry to a file
+      node_new->comp->type = COMP_FILE;
+      node_new->comp->lba =  root_dir_lba + (item[i].fstClusHI << 16 | item[i].fstClusLO) - root_cluster; 
+      node_new->comp->len = item[i].fileSize;
+    }
+  }
+
+  fat32fs_mounted = 1;
   return 0;
 }
 
+// fops
+static int fat32fs_write(file *file, const void *buf, size_t len){
+  uart_printf("Exception, fat32fs_write(), unimplemented.\r\n");
+  return -1;
+}
+static int fat32fs_read(file *file, void *buf, size_t len){
+  len = len <= file->vnode->comp->len ? len : file->vnode->comp->len;
+  uint32_t lba_count = len / SD_BLOCK_SIZE + (len%SD_BLOCK_SIZE != 0);
+  char *temp = diy_malloc(SD_BLOCK_SIZE * lba_count);
+  for(int i=0; i<lba_count; i++)
+    readblock(file->vnode->comp->lba + i, temp + i*SD_BLOCK_SIZE);
+  memcpy_(buf, temp, len);
 
+  uart_printf("Debug, fat32fs_read(), reading file %s, start lba=%d\r\n", file->vnode->comp->comp_name, file->vnode->comp->lba);
+  diy_free(temp);
+  return len;
+}
+static int fat32fs_open(vnode* file_node, file** target){
+  return tmpfs_open(file_node, target);
+}
+static int fat32fs_close(file *file){
+  return tmpfs_close(file);
+}
+
+// vops
+static int fat32fs_mkdir(vnode *dir_node, vnode **target, const char *component_name){
+  if(fat32fs_mounted){
+    uart_printf("Error, fat32fs_mkdir(), already mounted, cannot modify initramfs\r\n");
+    return 1;
+  }
+  else
+    return tmpfs_mkdir(dir_node, target, component_name);
+}
+static int fat32fs_create(vnode *dir_node, vnode **target, const char *component_name){
+  if(fat32fs_mounted){
+    uart_printf("Error, fat32fs_create(), already mounted, cannot modify initramfs\r\n");
+    return 1;
+  }
+  else
+    return tmpfs_create(dir_node, target, component_name);
+}
+static int fat32fs_lookup(vnode *dir_node, vnode **target, const char *component_name){
+  // uart_printf("Exception, fat32fs_lookup(), unimplemented, name=%s.\r\n", component_name);
+  return tmpfs_lookup(dir_node, target, component_name);
+}

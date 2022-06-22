@@ -31,6 +31,7 @@ typedef struct vnode_comp{ // vnode component
   union {
     vnode **entries; // for type of COMP_DIR
     char  *data;     // for type of COM_FILE
+    uint32_t lba;    // for FAT32
   };
 } vnode_comp;
 
