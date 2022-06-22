@@ -28,7 +28,8 @@
     "virtual_file_system.h": "c",
     "cpio.h": "c",
     "devfs.h": "c",
-    "mbox.h": "c"
+    "mbox.h": "c",
+    "sd.h": "c"
   }
 
 }

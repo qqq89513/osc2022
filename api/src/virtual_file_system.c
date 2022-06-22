@@ -5,6 +5,7 @@
 #include "diy_malloc.h"
 #include "cpio.h"
 #include "devfs.h"
+#include "fat32_on_SD.h"
 
 #define CURRENT_DIR "."
 #define PARENT_DIR ".."
@@ -224,6 +225,14 @@ int vfs_mount(char *pathname, const char *fs_name){
   else if(strcmp_(fs_name, devfs.name) == 0){
     mount_at_node->mount = diy_malloc(sizeof(mount));
     mount_at_node->mount->fs = &devfs;
+    const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
+    uart_printf("Debug, vfs_mount(), path=%s, fs=%s, root_vnode=0x%lX, mount_at=0x%lX, mount_to=0x%lX\r\n", 
+      pathname, fs_name, (uint64_t)&root_vnode, (uint64_t)mount_at_node, (uint64_t)mount_at_node->mount->root);
+    return ret;
+  }
+  else if(strcmp_(fs_name, fat32fs.name) == 0){
+    mount_at_node->mount = diy_malloc(sizeof(mount));
+    mount_at_node->mount->fs = &fat32fs;
     const int ret = mount_at_node->mount->fs->setup_mount(&tmpfs, mount_at_node->mount); // init of tmpfs
     uart_printf("Debug, vfs_mount(), path=%s, fs=%s, root_vnode=0x%lX, mount_at=0x%lX, mount_to=0x%lX\r\n", 
       pathname, fs_name, (uint64_t)&root_vnode, (uint64_t)mount_at_node, (uint64_t)mount_at_node->mount->root);

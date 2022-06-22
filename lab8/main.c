@@ -12,6 +12,7 @@
 #include "sys_reg.h"
 #include "system_call.h"
 #include "virtual_file_system.h"
+#include "sd.h"
 #include <stdint.h>
 
 #define MACHINE_NAME "rpi-baremetal-lab8$ "
@@ -63,6 +64,8 @@ void main(void *dtb_addr)
   vfs_mount("/initramfs", "initramfs");
   vfs_mkdir("/dev");
   vfs_mount("/dev", "devfs");
+  vfs_mkdir("/boot");
+  vfs_mount("/boot", "fat32fs");
 
   thread_init();
   thread_create(shell, USER);
@@ -102,6 +105,9 @@ static void sys_init(void *dtb_addr){
   mem_reserve(0x8000000, 0x8000000 + 247296);                     // initramfs, hard coded
   mem_reserve((uint64_t)dtb_addr, (uint64_t)dtb_addr + dtb_size); // device tree
   alloc_page_init();
+
+  // SD card init
+  sd_init();
 
   // Timer init for Lab5, basic 2, Video Player
   uint64_t tmp;
