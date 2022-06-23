@@ -14,13 +14,20 @@
   Ref[3]: https://github.com/LJP-TW/osc2022
   Ref[4]: https://www.easeus.com/resource/fat32-disk-structure.htm
   Ref[5]: https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
+  Ref[6]: https://www.youtube.com/watch?v=lz83GavddB0
 */
 
-static uint32_t FAT1_phy_bk;     // physical block
+static uint32_t FAT1_phy_bk;     // physical block, FAT has size of sec_per_fat32*SD_BLOCK_SIZE bytes
 static uint32_t root_dir_phy_bk; // physical block
 static uint32_t root_cluster;    // boot_sector_t.root_cluster, usually 2
+static uint32_t sec_per_fat32;   // boot_sector_t.sector_per_fat32
 
 #define FROM_LBA_TO_PHY_BK(lba) (root_dir_phy_bk +(lba) +  - root_cluster)
+#define FAT_ENTRY_EOF           ((uint32_t)0x0FFFFFF8) // end of file (end of linked list in FAT)
+#define FAT_ENTRY_EMPTY         ((uint32_t)0x00000000)
+#define DIR_ENTRY_ATTR_ARCHIVE  0x20    // file, page 23, Ref[5]
+#define DIR_ENTRY_wrtTime_mock  0x58D8  // 11:06:48AM
+#define DIR_ENTRY_wrtDate_mock  0x50C4  // 20200604
 
 typedef struct partition_t {
   uint8_t status;
@@ -111,6 +118,17 @@ static int fat32fs_mkdir(vnode *dir_node, vnode **target, const char *component_
 static int fat32fs_create(vnode *dir_node, vnode **target, const char *component_name);
 static int fat32fs_lookup(vnode *dir_node, vnode **target, const char *component_name);
 
+static int fat32_filename_to_str(const char *fat32_filename, char *str){
+  // Copy entry name
+  int j = 0;  // str[j]
+  int k = 0;  // fat32_filename[k];
+  for(k=0; k<8 && fat32_filename[k] != ' '; k++)    str[j++] = fat32_filename[k];
+  str[j++] = '.';
+  for(k=8; k<11 && fat32_filename[k] != ' '; k++)   str[j++] = fat32_filename[k];
+  str[j] = '\0';
+  return j;
+}
+
 filesystem fat32fs = {
   .name = "fat32fs",
   .setup_mount = fat32fs_mount
@@ -141,16 +159,16 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
 
   readblock(part1_phy_bk, buf);
 
-  uart_printf("First partition, =");
-  for(int i=0; i<SD_BLOCK_SIZE; i++) uart_printf("%02X ", buf[i]);
-  uart_printf("\r\n");
-
   boot_sector_t *VBR = (boot_sector_t*) buf;
   FAT1_phy_bk = part1_phy_bk + VBR->reserved_sector_cnt;
   root_dir_phy_bk = FAT1_phy_bk + (VBR->fat_cnt * VBR->sector_per_fat32);
   root_cluster = VBR->root_cluster;
+  sec_per_fat32 = VBR->sector_per_fat32;
   readblock(root_dir_phy_bk, buf);
   dir_entry *root_dir_entry = (dir_entry*) buf;
+
+  uart_printf("Debug, fat32fs_mount(), FAT1_phy_bk=%d, root_dir_phy_bk=%d, root_cluster=%d, sec_per_fat32=%d\r\n",
+    FAT1_phy_bk, root_dir_phy_bk, root_cluster, sec_per_fat32);
 
   mount->root = diy_malloc(sizeof(vnode));
   mount->fs = fs;
@@ -174,12 +192,7 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
       char *name = diy_malloc(sizeof(item->name) + 2); // +1 for . in fileName.ext and end of string
       
       // Copy entry name
-      int j = 0;  // name[j]
-      int k = 0;  // item[i].name[k];
-      for(k=0; k<8 && item[i].name[k] != ' '; k++)   name[j++] = item[i].name[k];
-      name[j++] = '.';
-      for(k=8; k<sizeof(item->name) && item[i].name[k] != ' '; k++)   name[j++] = item[i].name[k];
-      name[j] = '\0';
+      fat32_filename_to_str(item[i].name, name);
 
       // Create entry along tmpfs
       lookup_recur((char*)name, dir_node, &node_new, 1);
@@ -197,8 +210,38 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
 
 // fops
 static int fat32fs_write(file *file, const void *buf, size_t len){
-  uart_printf("Exception, fat32fs_write(), unimplemented.\r\n");
-  return -1;
+  len = len <= SD_BLOCK_SIZE ? len : SD_BLOCK_SIZE;
+  uint32_t block_cnt = len / SD_BLOCK_SIZE + (len%SD_BLOCK_SIZE != 0);
+  char *temp = diy_malloc(SD_BLOCK_SIZE * block_cnt);
+  char name[13];  // 11 char + '.' + '\0'
+  uint32_t phy_block = FROM_LBA_TO_PHY_BK(file->vnode->comp->lba);
+
+  // Read modify write
+  readblock(phy_block, temp);
+  memcpy_(temp, buf, len);
+  writeblock(phy_block, temp);
+
+  // Update root dir entry
+  readblock(root_dir_phy_bk, temp);
+  dir_entry *root_dir_entry = (dir_entry*) temp;
+  dir_entry *item = (dir_entry*) root_dir_entry;
+  const uint32_t entires_per_dir = SD_BLOCK_SIZE/sizeof(dir_entry);
+  int i = 0;
+  for(i=0; i<entires_per_dir; i++){
+    if(item[i].name[0] != '\0'){  // skip empty entry
+      fat32_filename_to_str(item[i].name, name);
+      if(strcmp_(file->vnode->comp->comp_name, name) == 0)
+        break;
+    }
+  }
+  if(i >= entires_per_dir) return -1;
+  item = &item[i];
+  item->fileSize = len;
+  writeblock(root_dir_phy_bk, temp);
+
+  file->vnode->comp->len = len;
+  diy_free(temp);
+  return len;
 }
 static int fat32fs_read(file *file, void *buf, size_t len){
   len = len <= file->vnode->comp->len ? len : file->vnode->comp->len;
@@ -231,8 +274,75 @@ static int fat32fs_mkdir(vnode *dir_node, vnode **target, const char *component_
 }
 static int fat32fs_create(vnode *dir_node, vnode **target, const char *component_name){
   if(fat32fs_mounted){
-    uart_printf("Error, fat32fs_create(), already mounted, cannot modify initramfs\r\n");
-    return 1;
+    // Find free entry in FAT1 and mark it as used (eof)
+    char temp[SD_BLOCK_SIZE];
+    uint32_t lba = 0;
+    const uint32_t entries_per_sec = SD_BLOCK_SIZE/sizeof(uint32_t);
+    for(int b=0; b<sec_per_fat32; b++){  // walk through sectors(blocks) in FAT1
+      readblock(b + FAT1_phy_bk, temp);
+      uint32_t *fat_entry = (uint32_t*) temp;
+      for(int i=0; i<entries_per_sec; i++){  // walk through each entry
+        if(fat_entry[i] == FAT_ENTRY_EMPTY){
+          fat_entry[i] = FAT_ENTRY_EOF; // immediate mark this as entry EOF, i.e., this file occupies 1 sector
+          writeblock(b + FAT1_phy_bk, temp); // write back
+          lba = b * entries_per_sec + i;
+          break;
+        }
+      }
+      if(lba != 0)
+        break;
+    }
+
+    // Fill free directory entry
+    if(lba != 0){
+      // uart_printf("Debug, fat32fs_create(), ------------- lba = %d\r\n", lba);
+
+      // Find free entry in root directory
+      readblock(root_dir_phy_bk, temp);
+      dir_entry *root_dir_entry = (dir_entry*) temp;
+      dir_entry *item = (dir_entry*) root_dir_entry;
+      const uint32_t entires_per_dir = SD_BLOCK_SIZE/sizeof(dir_entry);
+      int i = 0;
+      for(i=0; i<entires_per_dir; i++){
+        if(item[i].name[0] == '\0')
+          break;
+      }
+
+      // Free entry found
+      if(i < entires_per_dir){
+        item = &item[i];
+        int j = 0; // component_name[j]
+        int k = 0; // item->name[k]
+        // Copy filename
+        while(k < 8 && component_name[j] != '\0' && component_name[j] != '.') item->name[k++] = component_name[j++];
+        j++; // skip '.'
+        // Fill space
+        while(k < 8)  item->name[k++] = ' ';
+        // Copy extention
+        while(k < 11 && component_name[j] != '\0')  item->name[k++] = component_name[j++];
+
+        // Config entry metadata and write back to SD card
+        item->attr = DIR_ENTRY_ATTR_ARCHIVE;
+        item->wrtDate = DIR_ENTRY_wrtDate_mock;
+        item->wrtTime = DIR_ENTRY_wrtTime_mock;
+        item->fstClusHI = (lba >> 16) & 0x0000FFFF;
+        item->fstClusLO = lba & 0x0000FFFF;
+        item->fileSize = 0;
+        writeblock(root_dir_phy_bk, temp);  // since item is sort of temp's reference
+
+        int ret = tmpfs_create(dir_node, target, component_name);
+        if(ret == 0) (*target)->comp->lba = lba;
+        return ret;
+      }
+      else{
+        uart_printf("Error, fat32fs_create(), cannot find free entry in root_dir_entry\r\n");
+        return 1;
+      }
+    }
+    else {
+      uart_printf("Error, fat32fs_create(), cannot find free entry in FAT1\r\n");
+      return 1;
+    }
   }
   else
     return tmpfs_create(dir_node, target, component_name);

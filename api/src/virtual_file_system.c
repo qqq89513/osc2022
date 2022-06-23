@@ -79,9 +79,10 @@ int lookup_recur(char *pathname, vnode *dir_node, vnode **node_found, int create
     for(int i=0; i<comp_count; i++){
       if(rest_comps[i][0] == '\0') continue; // skip NULL strings
       // uart_printf("Debug, lookup_recur(), create, i=%d, dir=0x%lX, %s\r\n", i, (uint64_t)dir_node, rest_comps[i]);
-      mkdir_ret = dir_node->v_ops->mkdir(dir_node, node_found, rest_comps[i]);
+      mkdir_ret = dir_node->v_ops->create(dir_node, node_found, rest_comps[i]);
       if(mkdir_ret == 0){
         dir_node = *node_found;
+        dir_node->comp->type = COMP_DIR; // last component will be set to COMP_FILE in vfs_open()
       }
       else{
         uart_printf("Error, lookup_recur(), failed to create(), %s, rest_comps[%d]=%s\r\n", path_copy, i, rest_comps[i]);
