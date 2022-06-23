@@ -16,6 +16,11 @@
   Ref[5]: https://academy.cba.mit.edu/classes/networking_communications/SD/FAT.pdf
 */
 
+static uint32_t FAT1_phy_bk;     // physical block
+static uint32_t root_dir_phy_bk; // physical block
+static uint32_t root_cluster;    // boot_sector_t.root_cluster, usually 2
+
+#define FROM_LBA_TO_PHY_BK(lba) (root_dir_phy_bk +(lba) +  - root_cluster)
 
 typedef struct partition_t {
   uint8_t status;
@@ -26,7 +31,7 @@ typedef struct partition_t {
   uint8_t chse_head;
   uint8_t chse_sector;
   uint8_t chse_cylinder;
-  uint32_t lba;
+  uint32_t phy_bk;
   uint32_t sectors;
 } __attribute__((packed)) partition_t;
 
@@ -115,7 +120,7 @@ vnode_operations fat32fs_vops = {.lookup=fat32fs_lookup, .create=fat32fs_create,
 
 static int fat32fs_mount(filesystem *fs, mount *mount){
   const MBR_t *mbr;
-  uint32_t lba;
+  uint32_t part1_phy_bk;
   uint8_t buf[SD_BLOCK_SIZE];
 
   readblock(0, buf);
@@ -132,19 +137,19 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
     return -1;
   }
 
-  lba = mbr->part1.lba;
+  part1_phy_bk = mbr->part1.phy_bk;
 
-  readblock(lba, buf);
+  readblock(part1_phy_bk, buf);
 
   uart_printf("First partition, =");
   for(int i=0; i<SD_BLOCK_SIZE; i++) uart_printf("%02X ", buf[i]);
   uart_printf("\r\n");
 
   boot_sector_t *VBR = (boot_sector_t*) buf;
-  uint32_t FAT1_lba = lba + VBR->reserved_sector_cnt;
-  uint32_t root_dir_lba = FAT1_lba + (VBR->fat_cnt * VBR->sector_per_fat32);
-  uint32_t root_cluster = VBR->root_cluster;
-  readblock(root_dir_lba, buf);
+  FAT1_phy_bk = part1_phy_bk + VBR->reserved_sector_cnt;
+  root_dir_phy_bk = FAT1_phy_bk + (VBR->fat_cnt * VBR->sector_per_fat32);
+  root_cluster = VBR->root_cluster;
+  readblock(root_dir_phy_bk, buf);
   dir_entry *root_dir_entry = (dir_entry*) buf;
 
   mount->root = diy_malloc(sizeof(vnode));
@@ -153,7 +158,7 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
   mount->root->comp = diy_malloc(sizeof(vnode_comp));
   mount->root->comp->comp_name = "";
   mount->root->comp->len = 0;
-  mount->root->comp->lba = root_dir_lba;
+  mount->root->comp->lba = root_dir_phy_bk;
   mount->root->comp->type = COMP_DIR;
   mount->root->f_ops = &fat32fs_fops;
   mount->root->v_ops = &fat32fs_vops;
@@ -165,7 +170,7 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
   for(int i=0; i<SD_BLOCK_SIZE/sizeof(dir_entry); i++){
     
     // Skip empty entry
-    if(item[i].name[i] != '\0'){
+    if(item[i].name[0] != '\0'){
       char *name = diy_malloc(sizeof(item->name) + 2); // +1 for . in fileName.ext and end of string
       
       // Copy entry name
@@ -181,7 +186,7 @@ static int fat32fs_mount(filesystem *fs, mount *mount){
       
       // Config entry to a file
       node_new->comp->type = COMP_FILE;
-      node_new->comp->lba =  root_dir_lba + (item[i].fstClusHI << 16 | item[i].fstClusLO) - root_cluster; 
+      node_new->comp->lba =  item[i].fstClusHI << 16 | item[i].fstClusLO; 
       node_new->comp->len = item[i].fileSize;
     }
   }
@@ -197,13 +202,14 @@ static int fat32fs_write(file *file, const void *buf, size_t len){
 }
 static int fat32fs_read(file *file, void *buf, size_t len){
   len = len <= file->vnode->comp->len ? len : file->vnode->comp->len;
-  uint32_t lba_count = len / SD_BLOCK_SIZE + (len%SD_BLOCK_SIZE != 0);
-  char *temp = diy_malloc(SD_BLOCK_SIZE * lba_count);
-  for(int i=0; i<lba_count; i++)
-    readblock(file->vnode->comp->lba + i, temp + i*SD_BLOCK_SIZE);
+  uint32_t block_cnt = len / SD_BLOCK_SIZE + (len%SD_BLOCK_SIZE != 0);
+  char *temp = diy_malloc(SD_BLOCK_SIZE * block_cnt);
+  uint32_t phy_block = FROM_LBA_TO_PHY_BK(file->vnode->comp->lba);
+  for(int i=0; i<block_cnt; i++)
+    readblock(phy_block + i, temp + i*SD_BLOCK_SIZE);
   memcpy_(buf, temp, len);
 
-  uart_printf("Debug, fat32fs_read(), reading file %s, start lba=%d\r\n", file->vnode->comp->comp_name, file->vnode->comp->lba);
+  uart_printf("Debug, fat32fs_read(), reading file %s, starting phy block=%d\r\n", file->vnode->comp->comp_name, phy_block);
   diy_free(temp);
   return len;
 }
